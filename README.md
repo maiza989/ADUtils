@@ -14,10 +14,18 @@ This C# program allows you to unlock user accounts in Active Directory using adm
 2. Compile the program using Visual Studio or any C# compiler.
 3. Run the compiled executable.
 4. Enter the admin username and password when prompted.
-5. Follow the instructions to unlock user accounts:
-   - Enter the username of the account to unlock.
-   - Type 'exit' to quit the program.
-6. After unlocking accounts, press any key to exit.
+5. Follow the instructions:
+     > -   1- Unlock specific user.
+     > -   2- Check if any accounts are locked.
+     > -   3- Unlock all locked accounts.
+     > -   4- Exit/Close Application
+7. After unlocking accounts or exiting the program, press any key to close the application.
+
+## Features
+
+- **Unlock Specific User:** Allows unlocking a specific user account by entering the username.
+- **Check Locked Accounts:** Displays all locked user accounts in Active Directory.
+- **Unlock All Locked Accounts:** Unlocks all locked user accounts in Active Directory.
 
 ## Important Notes
 
