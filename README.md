@@ -19,7 +19,6 @@ This C# program allows you to unlock user accounts in Active Directory using adm
      > -   2- Check if any accounts are locked.
      > -   3- Unlock all locked accounts.
      > -   4- Exit/Close Application
-7. After unlocking accounts or exiting the program, press any key to close the application.
 
 ## Features
 
