@@ -1,12 +1,13 @@
 # Active Directory Utility
 
-This C# program allows you to unlock user accounts in Active Directory using admin credentials. It prompts for the admin username and password, then provides an interface to unlock user accounts.
+This C# program allows an admin to perform actions on users in Active Directory using admin credentials. It prompts for the admin username and password, then provides an interface to unlock user accounts, check locked accounts, list all security groups and distribution lists, add a user to security and distribution lists, and check user password expiration date.
 
 ## Prerequisites
 
-- .NET Framework installed
-- System.DirectoryServices.AccountManagement
-- Access to an Active Directory environment
+- .NET Framework installed.
+- System.DirectoryServices.AccountManagement.
+- ActiveDs library.
+- Access to an Active Directory environment.
 
 ## How to Use
 
@@ -22,7 +23,8 @@ This C# program allows you to unlock user accounts in Active Directory using adm
     Type "3" and hit Enter to unlock all locked accounts.
     Type "4" and hit Enter to list all groups in active directory.
     Type "5" and hit Enter to add user to a group.
-    Type "6" and hit Enter to exit/close  the application.
+    Type "6" and hit Enter to check the password expiration date.
+    Type "7" and hit enter to exit/close the application
     ```
 
 ## Features
@@ -32,6 +34,7 @@ This C# program allows you to unlock user accounts in Active Directory using adm
 - **Unlock All Locked Accounts:** Unlocks all locked user accounts in Active Directory.
 - **List All Groups:** Lists all groups in the Active Directory.
 - **Add User to Group:** Adds a user to a specified group in the Active Directory.
+- **Password Expiration:** Display a specific user password expiration date. 
 
 ## Important Notes
 
