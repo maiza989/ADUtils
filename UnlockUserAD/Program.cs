@@ -1,7 +1,9 @@
-﻿using System;
+﻿
+using System.Data;
 using System.Diagnostics;
+using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
-using System.Threading;
+
 
 class Program
 {
@@ -32,7 +34,7 @@ class Program
                     Console.WriteLine("3. Unlock all locked accounts");
                     Console.WriteLine("4. List all groups in active directory");
                     Console.WriteLine("5. Add User to a group");
-                    Console.WriteLine("6. Check user password expiration date **PENDING**");
+                    Console.WriteLine("6. Check user password expiration date");
                     Console.WriteLine("7. Exit");
                     Console.Write("Enter your choice: ");
 
@@ -55,10 +57,10 @@ class Program
                             AddUserToGroup(context);                                                                                                        // 5 To add user to a group 
                             break;
                         case "6":
-                            CheckExpiredPassword(context);
+                            GetAndPrintPasswordExpirationDate();                                                                                            // 6 check user password experation date
                             break;
                         case "7":
-                            exit = true;                                                                                                                    // 6 To Exit/Close application
+                            exit = true;                                                                                                                    // 7 To Exit/Close application
                             break;
                         default:
                             Console.WriteLine("Invalid option. Please try again.");
@@ -359,57 +361,76 @@ class Program
         }// end of catch
     }// end of ListAllGroups
 
-    static void CheckExpiredPassword(PrincipalContext context)
+    public static void GetAndPrintPasswordExpirationDate()
     {
         Console.Write("Enter the username to check password expiration: ");
         string username = Console.ReadLine();
 
         try
         {
-            UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
-
-            if (user != null)
+            using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
             {
-                if (user.PasswordNeverExpires) // Check if the password never expires
-                {
-                        
-                    DateTime passwordExpiration = user.AccountExpirationDate.Value.ToLocalTime();
+                UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);                                          // Searching for the user in AD
 
-                    if (passwordExpiration < DateTime.Today)
+                if (user != null)
+                {
+                    DateTime expirationDate = GetPasswordExpirationDate(user);                                                                              // Calculate password experation date
+                    DateTime lastSetDate = GetPasswordLastSetDate(user);
+
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                    Console.WriteLine($"\tPassword last set date for user '{username}': {lastSetDate}");
+                    Console.ForegroundColor = ConsoleColor.Gray;
+
+                    if (expirationDate != DateTime.MinValue && user.PasswordNeverExpires == false)
                     {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"User '{username}' password has expired.");
+                        Console.ForegroundColor = ConsoleColor.DarkCyan;
+                        Console.WriteLine($"\tPassword expiration date for user '{username}': {expirationDate}");
                         Console.ForegroundColor = ConsoleColor.Gray;
                     }
-                    else
+
+                    if (user.PasswordNeverExpires)
                     {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"User '{username}' password is not expired.");
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.WriteLine($"Password for user '{username}' never expires.");
                         Console.ForegroundColor = ConsoleColor.Gray;
                     }
+                    
                 }
                 else
                 {
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine($"Password for user '{username}' never expires.");
+                    Console.ForegroundColor = ConsoleColor.DarkRed;
+                    Console.WriteLine($"User '{username}' not found in Active Directory.");
                     Console.ForegroundColor = ConsoleColor.Gray;
                 }
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.DarkRed;
-                Console.WriteLine($"User '{username}' not found in Active Directory.");
-                Console.ForegroundColor = ConsoleColor.Gray;
             }
         }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"Error checking password expiration: {ex.Message}");
+            Console.WriteLine($"Error: {ex.Message}");
             Console.ForegroundColor = ConsoleColor.Gray;
         }
     }
 
+    public static DateTime GetPasswordExpirationDate(UserPrincipal user)
+    {
+        DirectoryEntry deUser = (DirectoryEntry)user.GetUnderlyingObject();                                                               // Grab the underlyning object for the user from AD.
+        ActiveDs.IADsUser nativeDeUser = (ActiveDs.IADsUser)deUser.NativeObject;                                                          // Get the native object from AD for the user.
+
+        DateTime passwordExpirationDate = nativeDeUser.PasswordExpirationDate;                                                            // Get password expiration date
+
+        return passwordExpirationDate;                                                                                                    // return the password expiration date for the user.
+    }
+
+    public static DateTime GetPasswordLastSetDate(UserPrincipal user)
+    {
+        DirectoryEntry deUser = (DirectoryEntry)user.GetUnderlyingObject();
+        ActiveDs.IADsUser nativeDeUser = (ActiveDs.IADsUser)deUser.NativeObject;
+
+        DateTime passwordLastChanged = nativeDeUser.PasswordLastChanged;
+
+        return passwordLastChanged;                                                                                                        // Return the password last time it changed for the user
+    }
 
     static string GetPassword()                                                                                                           // Method to read password without displaying it on the console
     {
