@@ -7,6 +7,10 @@ using System.Security.Cryptography.X509Certificates;
 using UnlockUserAD;
 
 
+// TODO - Notification system: notify IT of action performed
+// TODO - User Account Creation: Enable users to create new accounts in Active Directory. 
+// TODO - Audit Logging: Log fuction to record important action performed.
+
 
 
 class Program
@@ -44,13 +48,14 @@ class Program
                         {
                             Console.ForegroundColor = ConsoleColor.Gray;
                             Console.WriteLine("\nSelect an option:");
-                            Console.WriteLine("1. Unlock a specific user");
-                            Console.WriteLine("2. Check all locked accounts");
-                            Console.WriteLine("3. Unlock all locked accounts");
-                            Console.WriteLine("4. List all groups in active directory");
+                            Console.WriteLine("1. Unlock a Specific User");
+                            Console.WriteLine("2. Check All Locked Accounts");
+                            Console.WriteLine("3. Unlock All Locked Accounts");
+                            Console.WriteLine("4. List All Groups in Active Directory");
                             Console.WriteLine("5. Add User to a group");
-                            Console.WriteLine("6. Check user password expiration date");
-                            Console.WriteLine("7. Exit");
+                            Console.WriteLine("6. Remove User From a Group");
+                            Console.WriteLine("7. Check User Password Expiration Date");
+                            Console.WriteLine("8. Exit");
                             Console.Write("Enter your choice: ");
 
                             string choice = Console.ReadLine();
@@ -72,9 +77,12 @@ class Program
                                     ADGroupManager.AddUserToGroup(context);                                                                                                   // 5 To add user to a group 
                                     break;
                                 case "6":
-                                    PWDManager.GetPasswordExpirationDate();                                                                                                   // 6 check user password experation date
+                                    ADGroupManager.RemoveUserToGroup(context);
                                     break;
                                 case "7":
+                                    PWDManager.GetPasswordExpirationDate();                                                                                                   // 6 check user password experation date
+                                    break;
+                                case "8":
                                     exit = true;                                                                                                                              // 7 To Exit/Close application
                                     break;
                                 default:

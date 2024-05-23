@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+// TODO - Add ability to remove users for a certain GSs and DLs
 namespace UnlockUserAD
 {
     public class ADGroupActionManager
@@ -37,7 +38,6 @@ namespace UnlockUserAD
                 }
                 else
                 {
-
                     try
                     {
                         UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);                                              // Check for user in AD
@@ -83,6 +83,85 @@ namespace UnlockUserAD
                     {
                         Console.ForegroundColor = ConsoleColor.Red;
                         Console.WriteLine($"Error adding user to group: {ex.Message}");
+                        Console.ForegroundColor = ConsoleColor.Gray;
+                    }// end of catch
+                }
+            } while (!isExit);
+        }// end of AddUserToGroup
+
+        /// <summary>
+        /// A method that remove a user from a security group and distrubtion list in Active Directory
+        /// </summary>
+        /// <param name="context"></param>
+        public void RemoveUserToGroup(PrincipalContext context)
+        {
+            bool isExit = false;
+            do
+            {
+                Console.Write("Enter the username(Type 'exit' to go back to menu): ");
+                string username = Console.ReadLine().Trim();
+                if (username.ToLower().Trim() == "exit")
+                {
+                    isExit = true;
+                    Console.WriteLine($"\nReturing to menu...");
+                    break;
+                }
+                Console.Write("Enter the group name (Type 'exit' to go back to menu): ");
+                string groupName = Console.ReadLine().Trim();
+                if (groupName.ToLower().Trim() == "exit")
+                {
+                    isExit = true;
+                    Console.WriteLine($"Returing to menu...");
+                    break;
+                }
+                else
+                {
+                    try
+                    {
+                        UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);                                              // Check for user in AD
+
+                        if (user != null)
+                        {
+
+                            GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName);                                                                   // Check for group in AD
+
+                            if (group != null)
+                            {
+                                if (group.Members.Contains(user))                                                                                                      // If the user is not in the group add him
+                                {
+                                    // Add the user to the group
+                                    group.Members.Remove(user);                                                                                                      // Apply changes
+                                    group.Save();
+                                    group.Dispose();
+                                    Console.ForegroundColor = ConsoleColor.Green;
+                                    Console.WriteLine($"User '{username}' removed from group '{groupName}' successfully.");
+                                    Console.ForegroundColor = ConsoleColor.Gray;
+                                }// end of inner-2 if-statement
+                                else
+                                {
+                                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                                    Console.WriteLine($"User '{username}' is not a member of group '{groupName}'.");
+                                    Console.ForegroundColor = ConsoleColor.Gray;
+                                }// end of inner-2 else-statement
+                            }// end of inner if-statement
+                            else
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkRed;
+                                Console.WriteLine($"Group '{groupName}' not found in Active Directory.");
+                                Console.ForegroundColor = ConsoleColor.Gray;
+                            }// end of outter else-statement
+                        }// end of outter if-statement 
+                        else
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkRed;
+                            Console.WriteLine($"User '{username}' not found in Active Directory.");
+                            Console.ForegroundColor = ConsoleColor.Gray;
+                        }
+                    }// end of try
+                    catch (Exception ex)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"Error removing user from group: {ex.Message}");
                         Console.ForegroundColor = ConsoleColor.Gray;
                     }// end of catch
                 }

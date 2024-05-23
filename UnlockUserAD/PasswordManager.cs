@@ -37,9 +37,9 @@ namespace UnlockUserAD
 
                         if (expirationDate != DateTime.MinValue && user.PasswordNeverExpires == false)
                         {
-                           // Console.ForegroundColor = ConsoleColor.DarkCyan;
+                            Console.ForegroundColor = ConsoleColor.DarkCyan;
                             Console.WriteLine($"\tPassword expiration date for user '{username}': {expirationDate}");
-                           // Console.ForegroundColor = ConsoleColor.Gray;
+                            Console.ForegroundColor = ConsoleColor.Gray;
                         }// end inner if-statement
                         if (user.PasswordNeverExpires)
                         {

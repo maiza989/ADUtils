@@ -19,7 +19,7 @@ namespace UnlockUserAD
         /// A method to unlock one sepcific user.
         /// </summary>
         /// <param name="context">Based in what the computer domain</param>
-        public void UnlockUser(PrincipalContext context)                                                                                      // Method to unlock a specific user
+        public void UnlockUser(PrincipalContext context)                                                                                      
         {
             bool returnToMenu = false;
             do
@@ -74,7 +74,7 @@ namespace UnlockUserAD
         /// A method to go through every user in Active Directory and unlock all of them if any is locked.
         /// </summary>
         /// <param name="context">Based in what the computer domain</param>
-        public void UnlockAllUsers(PrincipalContext context)                                                                            // Method to unlock all locked accounts
+        public void UnlockAllUsers(PrincipalContext context)                                                                           
         {
             try
             {
@@ -120,12 +120,11 @@ namespace UnlockUserAD
         /// A method to check if any user is locked in Active Directory.
         /// </summary>
         /// <param name="context">Based in what the computer domain</param>
-        public void CheckLockedAccounts(PrincipalContext context)                                                                        // Method to check for locked accounts
+        public void CheckLockedAccounts(PrincipalContext context)                                                                        
         {
             Console.WriteLine("\nLocked user accounts:");
             try
             {
-               
                 PrincipalSearcher searcher = new PrincipalSearcher(new UserPrincipal(context) { Enabled = true });                              // Creating the search object
                 bool isAnyLocked = false;
                 foreach (var result in searcher.FindAll())                                                                                      // Look through what is in the user search object
@@ -153,8 +152,5 @@ namespace UnlockUserAD
                 Console.ForegroundColor = ConsoleColor.Gray;
             }// end of catch
         }// end of CheckLockedAccounts
-
-       
-
     }// end of class
 }// end of spacename
