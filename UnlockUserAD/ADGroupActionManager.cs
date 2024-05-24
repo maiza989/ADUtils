@@ -4,12 +4,14 @@ using System.DirectoryServices.AccountManagement;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Net.Mail;
 
-// TODO - Add ability to remove users for a certain GSs and DLs
+
 namespace UnlockUserAD
 {
     public class ADGroupActionManager
     {
+       
 
         /// <summary>
         /// A method to add user to group security and distrbuiton list in Active Directory.
@@ -221,5 +223,81 @@ namespace UnlockUserAD
                 Console.ForegroundColor = ConsoleColor.Gray;
             }// end of catch
         }// end of ListAllGroups
+
+        /// <summary>
+        /// A method that searches for the members of a specified group in Active Directory and lists them in a grid style.
+        /// </summary>
+        /// <param name="context"></param>
+        public void ListGroupMembers(PrincipalContext context)
+        {
+            bool isExit = false;
+            do
+            {
+                Console.Write("Enter the group name (Type 'exit' to go back to menu): ");
+                string groupName = Console.ReadLine().Trim();
+                if (groupName.ToLower() == "exit")
+                {
+                    isExit = true;
+                    Console.WriteLine("\nReturning to menu...");
+                    break;
+                }
+                else
+                {
+                    try
+                    {
+                        GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName); // Check for group in AD
+
+                        if (group != null)
+                        {
+                            Console.WriteLine($"\nMembers of group '{groupName}':");
+
+                            List<string> memberNames = new List<string>();
+                            foreach (var member in group.GetMembers())
+                            {
+                                memberNames.Add(member.SamAccountName);
+                            }// end of foreach
+
+                            if (memberNames.Count > 0)
+                            {
+                                memberNames.Sort();
+                                int maxMemberNameLength = memberNames.Max(m => m.Length);                                                                   // Find the longest member name length
+                                int columnWidth = maxMemberNameLength + 5;                                                                                  // Add padding
+                                int numColumns = Console.WindowWidth / columnWidth;                                                                         // Calculate number of columns based on window width
+                                int numRows = (int)Math.Ceiling((double)memberNames.Count / numColumns);                                                    // Calculate number of rows
+
+                                for (int i = 0; i < numRows; i++)                                                                                           // Nested for loop to print member names in a grid style
+                                {
+                                    for (int j = 0; j < numColumns; j++)
+                                    {
+                                        int index = i + j * numRows;                                                                                        // Calculate the index of the member based on 'i' rows and 'j' columns
+                                        if (index < memberNames.Count)
+                                        {
+                                            Console.Write($"- {memberNames[index].PadRight(columnWidth)}");                                                 // Print each member name with specified right padding
+                                        }// ned of if statement
+                                    }// end of for loop
+                                    Console.WriteLine();
+                                }// end of of for loop 
+                            }// end of if-statement
+                            else
+                            {
+                                Console.WriteLine("No members found in this group.");
+                            }// end of else-statement
+                        }// end of if-statements
+                        else
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkRed;
+                            Console.WriteLine($"Group '{groupName}' not found in Active Directory.");
+                            Console.ForegroundColor = ConsoleColor.Gray;
+                        }// end of else
+                    }// end of try-catch
+                    catch (Exception ex)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"Error listing members of group: {ex.Message}");
+                        Console.ForegroundColor = ConsoleColor.Gray;
+                    }// end of catch
+                }// end of else
+            } while (!isExit);
+        }// end of ListGroupMembers
     }// end of class
 }// end of namespace

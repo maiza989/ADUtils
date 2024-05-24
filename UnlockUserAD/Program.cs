@@ -54,8 +54,9 @@ class Program
                             Console.WriteLine("4. List All Groups in Active Directory");
                             Console.WriteLine("5. Add User to a group");
                             Console.WriteLine("6. Remove User From a Group");
-                            Console.WriteLine("7. Check User Password Expiration Date");
-                            Console.WriteLine("8. Exit");
+                            Console.WriteLine("7. Check Who is Memeber in a Group");
+                            Console.WriteLine("8. Check User Password Expiration Date");
+                            Console.WriteLine("9. Exit");
                             Console.Write("Enter your choice: ");
 
                             string choice = Console.ReadLine();
@@ -80,10 +81,13 @@ class Program
                                     ADGroupManager.RemoveUserToGroup(context);
                                     break;
                                 case "7":
-                                    PWDManager.GetPasswordExpirationDate();                                                                                                   // 6 check user password experation date
+                                    ADGroupManager.ListGroupMembers(context);
                                     break;
                                 case "8":
-                                    exit = true;                                                                                                                              // 7 To Exit/Close application
+                                    PWDManager.GetPasswordExpirationDate();                                                                                                   // 6 check user password experation date
+                                    break;
+                                case "9":
+                                    exit = true;                                                                                                                              // 9 To Exit/Close application
                                     break;
                                 default:
                                     Console.WriteLine("Invalid option. Please try again.");
