@@ -7,7 +7,7 @@ using System.Security.Cryptography.X509Certificates;
 using UnlockUserAD;
 
 
-// TODO - Notification system: notify IT of action performed
+
 // TODO - User Account Creation: Enable users to create new accounts in Active Directory. 
 // TODO - Audit Logging: Log fuction to record important action performed.
 

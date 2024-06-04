@@ -28,8 +28,8 @@ namespace UnlockUserAD
 
                     if (user != null)
                     {
-                        DateTime expirationDate = CalcPasswordExpirationDate(user);                                                                              // Calculate password experation date
-                        DateTime lastSetDate = GetPasswordLastSetDate(user);
+                        DateTime expirationDate = GetPasswordExpirationDate(user);                                                                               // Calculate password experation date
+                        DateTime lastSetDate = GetPasswordLastSetDate(user);                                                                                     // Calculate password last time it was set
 
                         Console.ForegroundColor = ConsoleColor.DarkCyan;
                         Console.WriteLine($"\tPassword last set date for user '{username}': {lastSetDate}");
@@ -69,7 +69,7 @@ namespace UnlockUserAD
         /// </summary>
         /// <param name="user"> Uses user Object in AD</param>
         /// <returns> Password expiration date</returns>
-        public static DateTime CalcPasswordExpirationDate(UserPrincipal user)
+        public static DateTime GetPasswordExpirationDate(UserPrincipal user)
         {
             DirectoryEntry deUser = (DirectoryEntry)user.GetUnderlyingObject();                                                               // Grab the underlyning object for the user from AD.
             ActiveDs.IADsUser nativeDeUser = (ActiveDs.IADsUser)deUser.NativeObject;                                                          // Get the native object from AD for the user.

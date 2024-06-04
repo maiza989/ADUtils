@@ -7,11 +7,12 @@ using System.Threading.Tasks;
 using System.Net.Mail;
 
 
+
 namespace UnlockUserAD
-{
+{ 
     public class ADGroupActionManager
-    {
-       
+    {       
+        EmailNotifcationManager emailNotifcation = new EmailNotifcationManager();
 
         /// <summary>
         /// A method to add user to group security and distrbuiton list in Active Directory.
@@ -59,6 +60,8 @@ namespace UnlockUserAD
                                     Console.ForegroundColor = ConsoleColor.Green;
                                     Console.WriteLine($"User '{username}' added to group '{groupName}' successfully.");
                                     Console.ForegroundColor = ConsoleColor.Gray;
+
+                                    emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", $"\"{user.DisplayName}\" has been Added to \"{groupName}\" group");
                                 }// end of inner-2 if-statement
                                 else
                                 {
@@ -138,6 +141,8 @@ namespace UnlockUserAD
                                     Console.ForegroundColor = ConsoleColor.Green;
                                     Console.WriteLine($"User '{username}' removed from group '{groupName}' successfully.");
                                     Console.ForegroundColor = ConsoleColor.Gray;
+
+                                    emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", $"\"{user.DisplayName}\" has been removed from \"{groupName}\" group");
                                 }// end of inner-2 if-statement
                                 else
                                 {
