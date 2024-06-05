@@ -61,7 +61,6 @@ namespace UnlockUserAD
                                     Console.WriteLine($"User '{username}' added to group '{groupName}' successfully.");
                                     Console.ForegroundColor = ConsoleColor.Gray;
 
-                                    emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", $"\"{user.DisplayName}\" has been Added to \"{groupName}\" group");
                                 }// end of inner-2 if-statement
                                 else
                                 {
@@ -83,6 +82,7 @@ namespace UnlockUserAD
                             Console.WriteLine($"User '{username}' not found in Active Directory.");
                             Console.ForegroundColor = ConsoleColor.Gray;
                         }
+                        emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", $"\"{user.DisplayName}\" has been Added to \"{groupName}\" group in Active Directory");
                     }// end of try
                     catch (Exception ex)
                     {
@@ -142,7 +142,6 @@ namespace UnlockUserAD
                                     Console.WriteLine($"User '{username}' removed from group '{groupName}' successfully.");
                                     Console.ForegroundColor = ConsoleColor.Gray;
 
-                                    emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", $"\"{user.DisplayName}\" has been removed from \"{groupName}\" group");
                                 }// end of inner-2 if-statement
                                 else
                                 {
@@ -164,6 +163,7 @@ namespace UnlockUserAD
                             Console.WriteLine($"User '{username}' not found in Active Directory.");
                             Console.ForegroundColor = ConsoleColor.Gray;
                         }
+                        emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", $"\"{user.DisplayName}\" has been removed from \"{groupName}\" group in Active Directory");
                     }// end of try
                     catch (Exception ex)
                     {

@@ -17,15 +17,15 @@ namespace UnlockUserAD
             try
             {
                 MailMessage mail = new MailMessage();                                                                                                       // Create a new message
-                SmtpClient smtpServer = new SmtpClient("10.0.2.125");                                                                                       // Replace with your SMTP server
+                SmtpClient smtpServer = new SmtpClient(mySTMPServer);                                                                                       // Replace with your SMTP server
 
-                mail.From = new MailAddress("FROM_EMIAL@*****.COM");                                                                                        // Replace with your FROM email
-                mail.To.Add("TO_EMIAL@*****.COM");                                                                                                          // Replace with your TO email
+                mail.From = new MailAddress("YOUR_FROM_EMAIL");                                                                                             // Replace with your FROM email
+                mail.To.Add("YOUR_TO_EMAIL");                                                                                                               // Replace with your TO email
                 mail.Subject = subject;
                 mail.Body = body;
 
                 smtpServer.Port = 587;                                                                                                                      // Typically 587 for SMTP
-                smtpServer.Credentials = new System.Net.NetworkCredential("FROM_EMAIL@lloydmc.com", myPassword);                                            // Replace with your credentials
+                smtpServer.Credentials = new System.Net.NetworkCredential("YOUR_FROM_EMAIL", myPassword);                                                   // Replace with your credentials
                 smtpServer.EnableSsl = false;                                                                                                               // Enable SSL if required by your SMTP provider
 
                 smtpServer.Send(mail);
