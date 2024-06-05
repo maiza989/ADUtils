@@ -21,6 +21,8 @@ namespace UnlockUserAD
         public void AddUserToGroup(PrincipalContext context)
         {
             bool isExit = false;
+            List<string> actionLog = new List<string>();
+
             do
             {
                 Console.Write("Enter the username(Type 'exit' to go back to menu): ");
@@ -61,6 +63,8 @@ namespace UnlockUserAD
                                     Console.WriteLine($"User '{username}' added to group '{groupName}' successfully.");
                                     Console.ForegroundColor = ConsoleColor.Gray;
 
+                                    actionLog.Add($"\"{user.DisplayName}\" has been Added to \"{groupName}\" group in Active Directory\n");
+
                                 }// end of inner-2 if-statement
                                 else
                                 {
@@ -82,7 +86,6 @@ namespace UnlockUserAD
                             Console.WriteLine($"User '{username}' not found in Active Directory.");
                             Console.ForegroundColor = ConsoleColor.Gray;
                         }
-                        emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", $"\"{user.DisplayName}\" has been Added to \"{groupName}\" group in Active Directory");
                     }// end of try
                     catch (Exception ex)
                     {
@@ -92,6 +95,11 @@ namespace UnlockUserAD
                     }// end of catch
                 }
             } while (!isExit);
+            if(actionLog.Count > 0 )
+            {
+                string emailBody = string.Join("\n", actionLog);
+                emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
+            }// end of if statement
         }// end of AddUserToGroup
 
         /// <summary>
@@ -101,6 +109,8 @@ namespace UnlockUserAD
         public void RemoveUserToGroup(PrincipalContext context)
         {
             bool isExit = false;
+            List<string> actionLog = new List<string>();
+
             do
             {
                 Console.Write("Enter the username(Type 'exit' to go back to menu): ");
@@ -135,12 +145,14 @@ namespace UnlockUserAD
                                 if (group.Members.Contains(user))                                                                                                      // If the user is not in the group add him
                                 {
                                     // Add the user to the group
-                                    group.Members.Remove(user);                                                                                                      // Apply changes
+                                    group.Members.Remove(user);                                                                                                        // Apply changes
                                     group.Save();
                                     group.Dispose();
                                     Console.ForegroundColor = ConsoleColor.Green;
                                     Console.WriteLine($"User '{username}' removed from group '{groupName}' successfully.");
                                     Console.ForegroundColor = ConsoleColor.Gray;
+
+                                    actionLog.Add($"\"{user.DisplayName}\" has been removed from \"{groupName}\" group in Active Directory\n");                           
 
                                 }// end of inner-2 if-statement
                                 else
@@ -163,7 +175,7 @@ namespace UnlockUserAD
                             Console.WriteLine($"User '{username}' not found in Active Directory.");
                             Console.ForegroundColor = ConsoleColor.Gray;
                         }
-                        emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", $"\"{user.DisplayName}\" has been removed from \"{groupName}\" group in Active Directory");
+                        
                     }// end of try
                     catch (Exception ex)
                     {
@@ -173,6 +185,12 @@ namespace UnlockUserAD
                     }// end of catch
                 }
             } while (!isExit);
+
+            if (actionLog.Count > 0)
+            {
+                string emailBody = string.Join("\n", actionLog);
+                emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
+            }
         }// end of AddUserToGroup
 
         /// <summary>
@@ -250,12 +268,12 @@ namespace UnlockUserAD
                 {
                     try
                     {
-                        GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName); // Check for group in AD
+                        GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName);                                                          // Check for group in AD
 
                         if (group != null)
                         {
                             Console.WriteLine($"\nMembers of group '{groupName}':");
-
+                           
                             List<string> memberNames = new List<string>();
                             foreach (var member in group.GetMembers())
                             {

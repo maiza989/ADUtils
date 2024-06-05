@@ -47,6 +47,7 @@ namespace UnlockUserAD
                             Console.WriteLine($"Password for user '{username}' never expires.");
                             Console.ForegroundColor = ConsoleColor.Gray;
                         }// end of inner if-statement
+                        
                     }// end of outter if-satetment
                     else
                     {
@@ -69,7 +70,7 @@ namespace UnlockUserAD
         /// </summary>
         /// <param name="user"> Uses user Object in AD</param>
         /// <returns> Password expiration date</returns>
-        public static DateTime GetPasswordExpirationDate(UserPrincipal user)
+        public DateTime GetPasswordExpirationDate(UserPrincipal user)
         {
             DirectoryEntry deUser = (DirectoryEntry)user.GetUnderlyingObject();                                                               // Grab the underlyning object for the user from AD.
             ActiveDs.IADsUser nativeDeUser = (ActiveDs.IADsUser)deUser.NativeObject;                                                          // Get the native object from AD for the user.
@@ -84,7 +85,7 @@ namespace UnlockUserAD
         /// </summary>
         /// <param name="user"> Uses user Object in AD</param>
         /// <returns>Password last changed</returns>
-        public static DateTime GetPasswordLastSetDate(UserPrincipal user)
+        public DateTime GetPasswordLastSetDate(UserPrincipal user)
         {
             DirectoryEntry deUser = (DirectoryEntry)user.GetUnderlyingObject();
             ActiveDs.IADsUser nativeDeUser = (ActiveDs.IADsUser)deUser.NativeObject;

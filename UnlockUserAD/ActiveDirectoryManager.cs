@@ -14,7 +14,55 @@ namespace UnlockUserAD
 {
     public class ActiveDirectoryManager
     {
+        PasswordManager passwordManager = new PasswordManager();
+        public void DisplayUserInfo(PrincipalContext context)
+        {
+            bool returnToMenu = false;
+            List<string> userGroups = new List<string>();
+            do
+            {
+                Console.Write("Enter the username to unlock (type 'exit' to return to the main menu): ");
+                string username = Console.ReadLine().Trim().ToLower();
 
+                if (username.ToLower().Trim() == "exit")
+                {
+                    returnToMenu = true;
+                }// end of if statement
+                else
+                {
+                    UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
+                    if(user != null)
+                    {
+                        var groups = user.GetGroups();
+                        foreach(var group in groups)
+                        {
+                            userGroups.Add(group.Name);
+                        }
+                        string userGroupString = string.Join(", ", userGroups);
+
+                        DirectoryEntry directoryEntry = user.GetUnderlyingObject() as DirectoryEntry;
+                        string title = directoryEntry.Properties["title"].Value as string;
+
+                        Console.WriteLine($"\n\tFirst name: {user.GivenName}\n" +
+                                          $"\tLast name: {user.Surname}\n" +
+                                          $"\tDisplay name: {user.DisplayName}\n" +
+                                          $"\tUsername: {user.SamAccountName}\n" +
+                                          $"\tEmail: {user.EmailAddress}\n" +
+                                          $"\tTitle: {title}\n" +
+                                          $"\tMember of: {userGroupString}\n" +
+                                          $"\tPassword Last Set: {passwordManager.GetPasswordLastSetDate(user)}\n" +
+                                          $"\tPassword Experation Date: {passwordManager.GetPasswordExpirationDate(user)}\n" +
+                                          $"\tBad Logon Counter: {user.BadLogonCount}\n" +
+                                          $"\tLast Bad Logon Attempt: {user.LastBadPasswordAttempt}\n" +
+                                          $"\tAccount Status: {user.Enabled}\n" +
+                                          $"\tAccount Lockout Status: {user.IsAccountLockedOut()}\n" +
+                                          $"\tHome Directory: {user.HomeDirectory}\n" +
+                                          $"\tSID: {user.Sid}\n" +
+                                          $"");
+                    }
+                }
+            }while (!returnToMenu);
+        }
         /// <summary>
         /// A method to unlock one sepcific user.
         /// </summary>
@@ -30,7 +78,7 @@ namespace UnlockUserAD
                 if (username.ToLower() == "menu")
                 {
                     returnToMenu = true;
-                }
+                }// end of if statement
                 else
                 {
                     try
@@ -44,6 +92,7 @@ namespace UnlockUserAD
                                 Console.ForegroundColor = ConsoleColor.Green;
                                 Console.WriteLine($"\tUser account '{username}' has been unlocked.");
                                 Console.ForegroundColor = ConsoleColor.Gray;
+                                
                             }// end of inner-if-statement
                             else
                             {
