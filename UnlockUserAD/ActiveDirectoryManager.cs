@@ -23,7 +23,7 @@ namespace UnlockUserAD
             List<string> userGroups = new List<string>();
             do
             {
-                Console.Write("Enter the username to unlock (type 'exit' to return to the main menu): ");
+                Console.Write("Enter the username to display info about (type 'exit' to return to the main menu): ");
                 string username = Console.ReadLine().Trim().ToLower();
 
                 if (username.ToLower().Trim() == "exit")
