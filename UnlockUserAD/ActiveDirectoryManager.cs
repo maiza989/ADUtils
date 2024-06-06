@@ -7,14 +7,16 @@ using UnlockUserAD;
 using System.Diagnostics;
 using System.Linq;
 
-
-// TODO - Add feature to display info of users
-
 namespace UnlockUserAD
 {
     public class ActiveDirectoryManager
     {
         PasswordManager passwordManager = new PasswordManager();
+
+        /// <summary>
+        /// A method that display a general information about a user.
+        /// </summary>
+        /// <param name="context"></param>
         public void DisplayUserInfo(PrincipalContext context)
         {
             bool returnToMenu = false;
@@ -37,7 +39,7 @@ namespace UnlockUserAD
                         foreach(var group in groups)
                         {
                             userGroups.Add(group.Name);
-                        }
+                        }// end of foreach
                         string userGroupString = string.Join(", ", userGroups);
 
                         DirectoryEntry directoryEntry = user.GetUnderlyingObject() as DirectoryEntry;
@@ -57,12 +59,12 @@ namespace UnlockUserAD
                                           $"\tAccount Status: {user.Enabled}\n" +
                                           $"\tAccount Lockout Status: {user.IsAccountLockedOut()}\n" +
                                           $"\tHome Directory: {user.HomeDirectory}\n" +
-                                          $"\tSID: {user.Sid}\n" +
-                                          $"");
-                    }
-                }
+                                          $"\tSID: {user.Sid}\n");
+                                          
+                    }// end of if statement
+                }// end of else statement
             }while (!returnToMenu);
-        }
+        }// end of DisplayUserInfo
         /// <summary>
         /// A method to unlock one sepcific user.
         /// </summary>
