@@ -9,6 +9,7 @@ using System.Linq;
 
 namespace UnlockUserAD
 {
+
     public class ActiveDirectoryManager
     {
         PasswordManager passwordManager = new PasswordManager();
@@ -44,6 +45,7 @@ namespace UnlockUserAD
 
                         DirectoryEntry directoryEntry = user.GetUnderlyingObject() as DirectoryEntry;
                         string title = directoryEntry.Properties["title"].Value as string;
+                        string department = directoryEntry.Properties["department"].Value as string;
 
                         Console.WriteLine($"\n\tFirst name: {user.GivenName}\n" +
                                           $"\tLast name: {user.Surname}\n" +
@@ -51,6 +53,7 @@ namespace UnlockUserAD
                                           $"\tUsername: {user.SamAccountName}\n" +
                                           $"\tEmail: {user.EmailAddress}\n" +
                                           $"\tTitle: {title}\n" +
+                                          $"\tDepartment: {department}\n" +
                                           $"\tMember of: {userGroupString}\n" +
                                           $"\tPassword Last Set: {passwordManager.GetPasswordLastSetDate(user)}\n" +
                                           $"\tPassword Experation Date: {passwordManager.GetPasswordExpirationDate(user)}\n" +
@@ -74,10 +77,10 @@ namespace UnlockUserAD
             bool returnToMenu = false;
             do
             {
-                Console.Write("Enter the username to unlock (type 'menu' to return to the main menu): ");
-                string username = Console.ReadLine().Trim();
+                Console.Write("Enter the username to unlock (type 'exit' to return to the main menu): ");
+                string username = Console.ReadLine().Trim().ToLower();
 
-                if (username.ToLower() == "menu")
+                if (username.ToLower().Trim() == "exit")
                 {
                     returnToMenu = true;
                 }// end of if statement

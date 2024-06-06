@@ -6,8 +6,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Net.Mail;
 
-
-
 namespace UnlockUserAD
 { 
     public class ADGroupActionManager
