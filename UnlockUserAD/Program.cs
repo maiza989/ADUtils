@@ -8,7 +8,7 @@ using UnlockUserAD;
 
 
 
-// TODO - User Account Creation: Enable users to create new accounts in Active Directory. 
+
 // TODO - Audit Logging: Log fuction to record important action performed.
 
 
@@ -214,36 +214,41 @@ class Program
     /// <param name="ADGroupManager"></param>
     static void DisplayGroupManagementMenu(PrincipalContext context, ADGroupActionManager ADGroupManager)
     {
-        Console.ForegroundColor = ConsoleColor.Gray;
-        Console.WriteLine("\nGroup Management:");
-        Console.WriteLine("1. List All Groups in Active Directory");
-        Console.WriteLine("2. Add User to a Group");
-        Console.WriteLine("3. Remove User From a Group");
-        Console.WriteLine("4. Check Who is Member in a Group");
-        Console.Write("Enter your choice(Type \"exit\" to return to main menu): ");
-
-        string choice = Console.ReadLine().ToLower().Trim();
-        switch (choice)
+        bool exit = false;
+        while (!exit)
         {
-            case "1":
-                ADGroupManager.ListAllGroups(context);
-                break;
-            case "2":
-                ADGroupManager.AddUserToGroup(context);
-                break;
-            case "3":
-                ADGroupManager.RemoveUserToGroup(context);
-                break;
-            case "4":
-                ADGroupManager.ListGroupMembers(context);
-                break;
-            case "exit":
-                DisplayMainMenu();
-                break;
-            default:
-                Console.WriteLine("Invalid option. Please try again.");
-                break;
-        }// end of switch-case
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.WriteLine("\nGroup Management:");
+            Console.WriteLine("1. List All Groups in Active Directory");
+            Console.WriteLine("2. Add User to a Group");
+            Console.WriteLine("3. Remove User From a Group");
+            Console.WriteLine("4. Check Who is Member in a Group");
+            Console.Write("Enter your choice(Type \"exit\" to return to main menu): ");
+
+            string choice = Console.ReadLine().ToLower().Trim();
+            switch (choice)
+            {
+                case "1":
+                    ADGroupManager.ListAllGroups(context);
+                    break;
+                case "2":
+                    ADGroupManager.AddUserToGroup(context);
+                    break;
+                case "3":
+                    ADGroupManager.RemoveUserToGroup(context);
+                    break;
+                case "4":
+                    ADGroupManager.ListGroupMembers(context);
+                    break;
+                case "exit":
+                    exit = true;
+                    break;
+                default:
+                    Console.WriteLine("Invalid option. Please try again.");
+                    break;
+            }// end of switch-case
+        }// end of while loop
+        Console.Clear();
     }// end of DisplayGroupMangementMenu
 
     /// <summary>
@@ -254,28 +259,33 @@ class Program
     /// <param name="PWDManager"></param>
     static void DisplayUserInfoMenu(PrincipalContext context, ActiveDirectoryManager ADManager, PasswordManager PWDManager)
     {
-        Console.ForegroundColor = ConsoleColor.Gray;
-        Console.WriteLine("\nUser Information:");
-        Console.WriteLine("1. Check User Password Expiration Date");
-        Console.WriteLine("2. Display General User Info");
-        Console.Write("Enter your choice(Type \"exit\" to return to main menu): ");
-
-        string choice = Console.ReadLine().ToLower().Trim();
-        switch (choice)
+        bool exit = false;
+        while (!exit)
         {
-            case "1":
-                PWDManager.GetPasswordExpirationDate();
-                break;
-            case "2":
-                ADManager.DisplayUserInfo(context);
-                break;
-            case "exit":
-                DisplayMainMenu();
-                break;
-            default:
-                Console.WriteLine("Invalid option. Please try again.");
-                break;
-        }// end of switch-case
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.WriteLine("\nUser Information:");
+            Console.WriteLine("1. Check User Password Expiration Date");
+            Console.WriteLine("2. Display General User Info");
+            Console.Write("Enter your choice(Type \"exit\" to return to main menu): ");
+
+            string choice = Console.ReadLine().ToLower().Trim();
+            switch (choice)
+            {
+                case "1":
+                    PWDManager.GetPasswordExpirationDate();
+                    break;
+                case "2":
+                    ADManager.DisplayUserInfo(context);
+                    break;
+                case "exit":
+                    exit = true;
+                    break;
+                default:
+                    Console.WriteLine("Invalid option. Please try again.");
+                    break;
+            }// end of switch-case
+        }// end of while loop
+        Console.Clear();
     }// end of DisplayUserInfoMenu
 
     static void DisplayUserCreationMenu()
