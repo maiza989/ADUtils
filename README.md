@@ -1,5 +1,7 @@
 # Active Directory Utility
 
+ =>>**PROJECT IS IN DEVELOPMENT**<<=
+
 This C# program allows an admin to perform actions on users in Active Directory using admin credentials. It prompts for the admin username and password, then provides an interface to unlock user accounts, check locked accounts, list all security groups and distribution lists, add a user to security and distribution lists, and check user password expiration date.
 
 ## Prerequisites
@@ -14,27 +16,29 @@ This C# program allows an admin to perform actions on users in Active Directory 
 1. Clone or download this repository.
 2. Compile the program using Visual Studio or any C# compiler.
 3. Run the compiled executable.
-4. Enter the admin username and password when prompted.
+4. Enter your Active Directory admin username and password when prompted.
 5. Follow the instructions:
 
     ```
-    Type "1" and hit Enter to unlock specific user. 
-    Type "2" and hit Enter to check if any accounts are locked.
-    Type "3" and hit Enter to unlock all locked accounts.
-    Type "4" and hit Enter to list all groups in active directory.
-    Type "5" and hit Enter to add user to a group.
-    Type "6" and hit Enter to check the password expiration date.
-    Type "7" and hit enter to exit/close the application
+    Type "1" and hit Enter to access user lock out manager 
+    Type "2" and hit Enter to access user group manager.
+    Type "3" and hit Enter to access user information manager.
     ```
-
 ## Features
 
+#### Lock Out Manager
 - **Unlock Specific User:** Allows unlocking a specific user account by entering the username.
 - **Check Locked Accounts:** Displays all locked user accounts in Active Directory.
 - **Unlock All Locked Accounts:** Unlocks all locked user accounts in Active Directory.
+#### Group Manager
 - **List All Groups:** Lists all groups in the Active Directory.
 - **Add User to Group:** Adds a user to a specified group in the Active Directory.
-- **Password Expiration:** Display a specific user password expiration date. 
+- **Remove User From group:** Remove a user from a specific group in the Active Directory
+- **Check Group Members:** Check who is a memeber of a specific group in the Active Directory
+- **Email Notification:** Send an email notifcation to desired location when update group member in Active Directory.
+#### User Info Manager
+- **Password Expiration:** Display a specific user password expiration date.
+- **User Infromation**: Display gerenal user infromamtion from the Active Direcotry.
 
 ## Important Notes
 
