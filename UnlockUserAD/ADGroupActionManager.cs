@@ -11,7 +11,12 @@ namespace UnlockUserAD
     public class ADGroupActionManager
     {       
         EmailNotifcationManager emailNotifcation = new EmailNotifcationManager();
+        AuditLogManager auditLogManager = new AuditLogManager();    
 
+        public ADGroupActionManager()
+        {
+           //auditLogManager.RedirectConsoleOutput();                                                                                                                   // Comment out if you want to log everything in the console.
+        }
         /// <summary>
         /// A method to add user to group security and distrbuiton list in Active Directory.
         /// </summary>
@@ -19,7 +24,7 @@ namespace UnlockUserAD
         public void AddUserToGroup(PrincipalContext context)
         {
             bool isExit = false;
-            List<string> actionLog = new List<string>();
+            List<string> actionLog = new List<string>();                                                                                                               // Email log list
 
             do
             {
@@ -61,7 +66,9 @@ namespace UnlockUserAD
                                     Console.WriteLine($"User '{username}' added to group '{groupName}' successfully.");
                                     Console.ForegroundColor = ConsoleColor.Gray;
 
-                                    actionLog.Add($"\"{user.DisplayName}\" has been Added to \"{groupName}\" group in Active Directory\n");
+                                    string logEntry = ($"\"{user.DisplayName}\" has been Added to \"{groupName}\" group in Active Directory\n");
+                                    actionLog.Add(logEntry);
+                                    auditLogManager.Log(logEntry);
 
                                 }// end of inner-2 if-statement
                                 else
@@ -131,12 +138,12 @@ namespace UnlockUserAD
                 {
                     try
                     {
-                        UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);                                              // Check for user in AD
+                        UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);                                             // Check for user in AD
 
                         if (user != null)
                         {
 
-                            GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName);                                                                   // Check for group in AD
+                            GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName);                                                                  // Check for group in AD
 
                             if (group != null)
                             {
@@ -150,7 +157,9 @@ namespace UnlockUserAD
                                     Console.WriteLine($"User '{username}' removed from group '{groupName}' successfully.");
                                     Console.ForegroundColor = ConsoleColor.Gray;
 
-                                    actionLog.Add($"\"{user.DisplayName}\" has been removed from \"{groupName}\" group in Active Directory\n");                           
+                                    string logEntry = ($"\"{user.DisplayName}\" has been removed from \"{groupName}\" group in Active Directory\n");
+                                    actionLog.Add(logEntry);
+                                    auditLogManager.Log(logEntry);
 
                                 }// end of inner-2 if-statement
                                 else

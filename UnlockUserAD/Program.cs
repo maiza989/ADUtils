@@ -16,13 +16,12 @@ class Program
 {
     static bool isLocked = false;
     static int countdownSeconds = 60;
-
+    static string adminUsername, adminPassword;
     static void Main(string[] args)
     {
+        PasswordManager PWDManager = new PasswordManager();
         ActiveDirectoryManager ADManager = new ActiveDirectoryManager();
         ADGroupActionManager ADGroupManager = new ADGroupActionManager();
-        PasswordManager PWDManager = new PasswordManager();
-        string adminUsername, adminPassword;
         
         do
         {
@@ -30,7 +29,7 @@ class Program
             adminUsername = Console.ReadLine().Trim();
             Console.Write("Enter admin password: ");
             adminPassword = PasswordManager.GetPassword().Trim();
-
+            
             try
             {
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))                                              // Check if the the password/user are correct
@@ -119,6 +118,7 @@ class Program
         } while (string.IsNullOrEmpty(adminPassword));                                                                                                                         // Repeat until a valid password is entered
     }// end of Main Method
 
+
     //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     //                                                                                                          UI
     //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -164,7 +164,7 @@ class Program
             default:
                 Console.WriteLine("Invalid option. Please try again.");
                 break;
-        }
+        }// end of switch case
         return false;
     }// end of Handle
 

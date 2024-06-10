@@ -5,12 +5,14 @@ namespace UnlockUserAD
 {
     public class AuditLogManager
     {
-        private static readonly string logFilePath = "audit_log.txt";
-
+        private static readonly string logFilePath = @"PATH\YOU\WANT";
+        
         public AuditLogManager()
         {
             // Ensure the log file is created and append mode is set
-            File.AppendAllText(logFilePath, $"Audit log started at {DateTime.Now}\n");
+            File.AppendAllText(logFilePath, $"--------------------------------------------------------------------------\n" +
+                                            $"\t\t\t\tAudit log started at {DateTime.Now}\n" +
+                                            $"--------------------------------------------------------------------------\n");
         }
         public void Log(string message)
         {
@@ -20,10 +22,12 @@ namespace UnlockUserAD
         public void RedirectConsoleOutput()
         {
             FileStream fileStream = new FileStream(logFilePath, FileMode.Append, FileAccess.Write);
-            StreamWriter streamWriter = new StreamWriter(fileStream);
-            streamWriter.AutoFlush = true;
-            Console.SetOut(streamWriter);
-            Console.SetError(streamWriter); // Optional: Redirect error output as well
+            StreamWriter fileWriter = new StreamWriter(fileStream) { AutoFlush = true };
+
+            TextWriter consoleWriter = Console.Out;
+            TextWriter dualWriter = new DualWriterManager(consoleWriter, fileWriter);
+            Console.SetOut(dualWriter);
+            Console.SetError(dualWriter); // Optional: Redirect error output as well
         }
     }// end of class
 }// end of namespace
