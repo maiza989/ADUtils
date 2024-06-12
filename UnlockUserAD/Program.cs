@@ -5,12 +5,7 @@ using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Security.Cryptography.X509Certificates;
 using UnlockUserAD;
-
-
-
-
-// TODO - Audit Logging: Log fuction to record important action performed.
-
+// TODO - DONE - Audit Logging: Log fuction to record important action performed.
 
 class Program
 {
@@ -280,6 +275,9 @@ class Program
                     break;
                 case "2":
                     ADManager.DisplayUserInfo(context);
+                    break;
+                case "3":
+                    PWDManager.ResetUserPassowrd();
                     break;
                 case "exit":
                     exit = true;

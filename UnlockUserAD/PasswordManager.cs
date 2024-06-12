@@ -12,6 +12,45 @@ namespace UnlockUserAD
 {
     public class PasswordManager
     {
+        DateTime todayDate = DateTime.Now;
+        public void ResetUserPassowrd()
+        {
+            Console.Write("Enter the username to reset password for: ");
+            string username = Console.ReadLine();
+
+            try
+            {
+                using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
+                {
+                    UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);                                           // Searching for the user in AD
+
+                    if (user != null)
+                    {
+                        DateTime expirationDate = GetPasswordExpirationDate(user);
+
+                        if(expirationDate < todayDate) 
+                        {
+                            Console.WriteLine("Expired");      
+                        }// end of if-statemnet
+                        else
+                        {
+                            Console.WriteLine("Not Expired");
+                        }
+                    }// end of if-statemnet
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkRed;
+                        Console.WriteLine($"User '{username}' not found in Active Directory.");
+                        Console.ForegroundColor = ConsoleColor.Gray;
+                    }// end of else-statemnet
+                }// end of using
+
+            }// end of try
+            catch
+            {
+
+            }// end of catch
+        }
         /// <summary>
         /// A method return user password expiration date and last time it was set. 
         /// </summary>
