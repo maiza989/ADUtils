@@ -11,11 +11,13 @@ namespace UnlockUserAD
     public class ADGroupActionManager
     {       
         EmailNotifcationManager emailNotifcation = new EmailNotifcationManager();
-        AuditLogManager auditLogManager = new AuditLogManager();    
+        AuditLogManager auditLogManager;
 
-        public ADGroupActionManager()
+        public ADGroupActionManager(AuditLogManager auditLogManager)
         {
-           //auditLogManager.RedirectConsoleOutput();                                                                                                                   // Comment out if you want to log everything in the console.
+            //auditLogManager.RedirectConsoleOutput();                                                                                                                   // Comment out if you want to log everything in the console.
+            this.auditLogManager = auditLogManager;
+            
         }
         /// <summary>
         /// A method to add user to group security and distrbuiton list in Active Directory.

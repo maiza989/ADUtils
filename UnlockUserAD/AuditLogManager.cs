@@ -5,20 +5,55 @@ namespace UnlockUserAD
 {
     public class AuditLogManager
     {
-        private static readonly string logFilePath = @"PATH\YOU\WANT";
-        
-        public AuditLogManager()
+        private static readonly string BaseLogDirectory = @"Path/you/want/your/logs/in";
+        private readonly string logFilePath;
+
+        /// <summary>
+        /// A constructor that create and ensure the for log file exists.
+        /// </summary>
+        /// <param name="adminUsername"></param>
+        public AuditLogManager(string adminUsername)
         {
-            // Ensure the log file is created and append mode is set
-            File.AppendAllText(logFilePath, $"--------------------------------------------------------------------------\n" +
-                                            $"\t\t\t\tAudit log started at {DateTime.Now}\n" +
-                                            $"--------------------------------------------------------------------------\n");
-        }
+            
+            logFilePath = Path.Combine(BaseLogDirectory, $"{adminUsername}.log");                                                                                                           // Create a log file based on the user logged into ADUtil
+            Directory.CreateDirectory(BaseLogDirectory);                                                                                                                                    // Ensure the directory exist
+            InitilizeLogFile();                                                                                                                                                             // Set append mode 
+        }// end of Auditlog manager constructor
+
+        private void InitilizeLogFile()
+        {
+            File.AppendAllText(logFilePath, $"---------------------------------------------------------------------------------------------------------------------\n" +
+                                           $"\t\t\t\tAudit log started at {DateTime.Now}\n" +
+                                           $"---------------------------------------------------------------------------------------------------------------------\n");
+        }// end of Initilizelogfile
+
+        /// <summary>
+        /// A method that log action to a log file in Logs folder.
+        /// </summary>
+        /// <param name="message"></param>
+        /// <exception cref="InvalidOperationException"></exception>
         public void Log(string message)
         {
+            if (string.IsNullOrEmpty(logFilePath))
+            {
+                throw new InvalidOperationException("Log file path is not set.");
+            }// end of if statement
+
             string logEntry = $"{DateTime.Now}: {message}\n";
-            File.AppendAllText(logFilePath, logEntry);
-        }
+            try
+            {
+                File.AppendAllText(logFilePath, logEntry);
+            }// end of try
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error writing to log file: {ex.Message}");
+                // Optionally rethrow or handle the exception as needed
+            }// end of catch
+        }// end of log
+
+        /// <summary>
+        /// a method that 
+        /// </summary>
         public void RedirectConsoleOutput()
         {
             FileStream fileStream = new FileStream(logFilePath, FileMode.Append, FileAccess.Write);
@@ -28,6 +63,6 @@ namespace UnlockUserAD
             TextWriter dualWriter = new DualWriterManager(consoleWriter, fileWriter);
             Console.SetOut(dualWriter);
             Console.SetError(dualWriter); // Optional: Redirect error output as well
-        }
+        }// end of RedirectConsoleOutput
     }// end of class
 }// end of namespace

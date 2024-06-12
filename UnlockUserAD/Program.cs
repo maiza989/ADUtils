@@ -21,7 +21,8 @@ class Program
     {
         PasswordManager PWDManager = new PasswordManager();
         ActiveDirectoryManager ADManager = new ActiveDirectoryManager();
-        ADGroupActionManager ADGroupManager = new ADGroupActionManager();
+        ADGroupActionManager ADGroupManager = null;
+        AuditLogManager auditLogManager = null;
         
         do
         {
@@ -40,6 +41,9 @@ class Program
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine($"Connected to Active Directory as: {adminUsername}.");
                         Console.ForegroundColor = ConsoleColor.Gray;
+
+                        auditLogManager = new AuditLogManager(adminUsername);
+                        ADGroupManager = new ADGroupActionManager(auditLogManager);
 
                         bool exit = false;
                         while (!exit)                                                                                                                                          // Loop the menu
