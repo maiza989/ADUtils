@@ -3,6 +3,7 @@ using System.Data;
 using System.Diagnostics;
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
+using System.Text.RegularExpressions;
 using UnlockUserAD;
 
 
@@ -12,6 +13,7 @@ namespace UnlockUserAD
 {
     public class PasswordManager
     {
+        AuditLogManager auditLogManager;
         DateTime todayDate = DateTime.Now;
         public void ResetUserPassowrd()
         {
@@ -28,13 +30,33 @@ namespace UnlockUserAD
                     {
                         DateTime expirationDate = GetPasswordExpirationDate(user);
 
-                        if(expirationDate < todayDate) 
+                        Console.WriteLine("\nPassword Requirement: 15 Characters, Symbols, Number, Lower and upper case. ");
+                        Console.Write("Enter the desired password: ");
+                        string password = Console.ReadLine();
+
+                        if (IsPasswordVaild(password))
                         {
-                            Console.WriteLine("Expired");      
-                        }// end of if-statemnet
+                            Console.Write($"Password: {password}\n" +
+                                              $"Is this the password you desire?(Y/N)");
+                            string comfirmation = Console.ReadLine().ToUpper().Trim();
+
+                            if (comfirmation == "Y")
+                            {
+                                user.SetPassword(password);
+                                user.Save();
+
+                                string logEntry = $"User \"{user}\" Password has been changed sucessfully at {DateTime.UtcNow}\n";
+                                Console.WriteLine(logEntry);
+                                auditLogManager.Log(logEntry);
+                            }// end of if statement
+                            else
+                            {
+                                Console.WriteLine("Returning to menu...");
+                            }// end of else statement
+                        }// end of if statement
                         else
                         {
-                            Console.WriteLine("Not Expired");
+                            Console.WriteLine("Password does not meet the requirement. Please try again.");
                         }
                     }// end of if-statemnet
                     else
@@ -46,10 +68,27 @@ namespace UnlockUserAD
                 }// end of using
 
             }// end of try
-            catch
+            catch(Exception ex)
             {
-
+                Console.WriteLine($"Error resetting password: {ex.Message}");
             }// end of catch
+        }// end of ReserUserPassword
+
+        private bool IsPasswordVaild(string password)
+        {
+            if(password.Length < 15)
+            {
+                return false;
+            }
+            else
+            {
+                bool hasUpperCase = Regex.IsMatch(password, "[A-Z]");
+                bool hasLowerCase = Regex.IsMatch(password, "[a-z]");
+                bool hasDigit = Regex.IsMatch(password, "[0-9]");
+                bool hasSymbol = Regex.IsMatch(password, @"[\W_]");
+
+                return hasUpperCase && hasLowerCase && hasDigit && hasSymbol;
+            }
         }
         /// <summary>
         /// A method return user password expiration date and last time it was set. 

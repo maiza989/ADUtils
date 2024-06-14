@@ -5,7 +5,7 @@ namespace UnlockUserAD
 {
     public class AuditLogManager
     {
-        private static readonly string BaseLogDirectory = @"Path/you/want/your/logs/in";
+        private static readonly string BaseLogDirectory = @"path/you/want/to/store/your/logs";
         private readonly string logFilePath;
 
         /// <summary>
@@ -14,17 +14,23 @@ namespace UnlockUserAD
         /// <param name="adminUsername"></param>
         public AuditLogManager(string adminUsername)
         {
-            
+            try
+            {
             logFilePath = Path.Combine(BaseLogDirectory, $"{adminUsername}.log");                                                                                                           // Create a log file based on the user logged into ADUtil
             Directory.CreateDirectory(BaseLogDirectory);                                                                                                                                    // Ensure the directory exist
             InitilizeLogFile();                                                                                                                                                             // Set append mode 
+            }// end of try
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error validating log file: {ex.Message}");
+            }// end of catch
         }// end of Auditlog manager constructor
 
         private void InitilizeLogFile()
         {
             File.AppendAllText(logFilePath, $"---------------------------------------------------------------------------------------------------------------------\n" +
-                                           $"\t\t\t\tAudit log started at {DateTime.Now}\n" +
-                                           $"---------------------------------------------------------------------------------------------------------------------\n");
+                                            $"\t\t\t\tAudit log started at {DateTime.Now}\n" +
+                                            $"---------------------------------------------------------------------------------------------------------------------\n");
         }// end of Initilizelogfile
 
         /// <summary>

@@ -43,60 +43,9 @@ class Program
                         bool exit = false;
                         while (!exit)                                                                                                                                          // Loop the menu
                         {
-                              DisplayMainMenu();
-                              string choice = Console.ReadLine();
-                              exit = HandleMainMenuChoice(choice, context, ADManager, ADGroupManager, PWDManager);
-                           /* Console.ForegroundColor = ConsoleColor.Gray;
-                            Console.WriteLine("\nSelect an option:");
-                            Console.WriteLine("1. Unlock a Specific User");
-                            Console.WriteLine("2. Check All Locked Accounts");
-                            Console.WriteLine("3. Unlock All Locked Accounts");
-                            Console.WriteLine("4. Check User Password Expiration Date");
-                            Console.WriteLine("5. List All Groups in Active Directory");
-                            Console.WriteLine("6. Add User to a group");
-                            Console.WriteLine("7. Remove User From a Group");
-                            Console.WriteLine("8. Check Who is Memeber in a Group");
-                            Console.WriteLine("9. Display General A User Info");
-                            Console.WriteLine("10. Exit");
-                            Console.Write("Enter your choice: ");
-
+                            DisplayMainMenu();
                             string choice = Console.ReadLine();
-                            switch (choice)
-                            {
-                                case "1":
-                                    ADManager.UnlockUser(context);                                                                                                            // 1 To Unlock Specific user
-                                    break;
-                                case "2":
-                                    ADManager.CheckLockedAccounts(context);                                                                                                   // 2 To Check all Unlocked users
-                                    break;
-                                case "3":
-                                    ADManager.UnlockAllUsers(context);                                                                                                       // 3 To Unlock all users
-                                    break;
-                                case "4":
-                                    ADGroupManager.ListGroupMembers(context);
-                                    break;
-                                case "5":
-                                    ADGroupManager.ListAllGroups(context);                                                                                                    // 4 To list all groups in AD
-                                    break;
-                                case "6":
-                                    ADGroupManager.AddUserToGroup(context);                                                                                                   // 5 To add user to a group 
-                                    break;
-                                case "7":
-                                    ADGroupManager.RemoveUserToGroup(context);
-                                    break;
-                                case "8":
-                                    PWDManager.GetPasswordExpirationDate();                                                                                                   // 6 check user password experation date
-                                    break;
-                                case "9":
-                                    ADManager.DisplayUserInfo(context);
-                                    break;
-                                case "10":
-                                    exit = true;                                                                                                                              // 9 To Exit/Close application
-                                    break;
-                                default:
-                                    Console.WriteLine("Invalid option. Please try again.");
-                                    break;
-                            }// end of switch-case*/
+                            exit = HandleMainMenuChoice(choice, context, ADManager, ADGroupManager, PWDManager);
                         }// end of while-loop
                     }// end of if statement
                 }// end of using
