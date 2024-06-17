@@ -214,6 +214,7 @@ class Program
             Console.WriteLine("\nUser Information:");
             Console.WriteLine("1. Check User Password Expiration Date");
             Console.WriteLine("2. Display General User Info");
+            Console.WriteLine("3. Reset A User Password");
             Console.Write("Enter your choice(Type \"exit\" to return to main menu): ");
 
             string choice = Console.ReadLine().ToLower().Trim();

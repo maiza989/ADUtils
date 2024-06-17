@@ -47,22 +47,22 @@ namespace UnlockUserAD
                         string title = directoryEntry.Properties["title"].Value as string;
                         string department = directoryEntry.Properties["department"].Value as string;
 
-                        Console.WriteLine($"\n\tFirst name: {user.GivenName}\n" +
-                                          $"\tLast name: {user.Surname}\n" +
-                                          $"\tDisplay name: {user.DisplayName}\n" +
-                                          $"\tUsername: {user.SamAccountName}\n" +
-                                          $"\tEmail: {user.EmailAddress}\n" +
-                                          $"\tTitle: {title}\n" +
-                                          $"\tDepartment: {department}\n" +
-                                          $"\tMember of: {userGroupString}\n" +
-                                          $"\tPassword Last Set: {passwordManager.GetPasswordLastSetDate(user)}\n" +
-                                          $"\tPassword Experation Date: {passwordManager.GetPasswordExpirationDate(user)}\n" +
-                                          $"\tBad Logon Counter: {user.BadLogonCount}\n" +
-                                          $"\tLast Bad Logon Attempt: {user.LastBadPasswordAttempt}\n" +
-                                          $"\tAccount Status: {user.Enabled}\n" +
-                                          $"\tAccount Lockout Status: {user.IsAccountLockedOut()}\n" +
-                                          $"\tHome Directory: {user.HomeDirectory}\n" +
-                                          $"\tSID: {user.Sid}\n");
+                        Console.WriteLine($"\nFirst name: {user.GivenName}\n" +
+                                          $"Last name: {user.Surname}\n" +
+                                          $"Display name: {user.DisplayName}\n" +
+                                          $"Username: {user.SamAccountName}\n" +
+                                          $"Email: {user.EmailAddress}\n" +
+                                          $"Title: {title}\n" +
+                                          $"Department: {department}\n" +
+                                          $"Member of: {userGroupString}\n" +
+                                          $"Password Last Set: {passwordManager.GetPasswordLastSetDate(user)}\n" +
+                                          $"Password Experation Date: {passwordManager.GetPasswordExpirationDate(user)}\n" +
+                                          $"Bad Logon Counter: {user.BadLogonCount}\n" +
+                                          $"Last Bad Logon Attempt: {user.LastBadPasswordAttempt}\n" +
+                                          $"Account Status: {user.Enabled}\n" +
+                                          $"Account Lockout Status: {user.IsAccountLockedOut()}\n" +
+                                          $"Home Directory: {user.HomeDirectory}\n" +
+                                          $"SID: {user.Sid}\n");
                                           
                     }// end of if statement
                 }// end of else statement
