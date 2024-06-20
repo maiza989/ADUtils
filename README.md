@@ -39,6 +39,7 @@ This C# program allows an admin to perform actions on users in Active Directory 
 #### User Info Manager
 - **Password Expiration:** Display a specific user password expiration date.
 - **User Infromation**: Display gerenal user infromamtion from the Active Direcotry.
+- **Password Reset**: Reset a user password and make sure it meet the requirement for 15 characters, symbols, number, lower and uppper case. 
 
 ## Important Notes
 
