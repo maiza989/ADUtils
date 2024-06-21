@@ -12,7 +12,8 @@ namespace UnlockUserAD
 
     public class ActiveDirectoryManager
     {
-        PasswordManager passwordManager;
+        PasswordManager passwordManager = new PasswordManager();
+
 
         /// <summary>
         /// A method that display a general information about a user.

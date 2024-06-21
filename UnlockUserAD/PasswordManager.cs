@@ -16,6 +16,7 @@ namespace UnlockUserAD
         AuditLogManager auditLogManager;
         DateTime todayDate = DateTime.Now;
 
+        public PasswordManager() { }
         public PasswordManager(AuditLogManager auditLogManager)
         {
            this.auditLogManager = auditLogManager;
