@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 using UnlockUserAD;
 
 
-// TODO - Add feature to Reset user password 
+// TODO - DONE Add feature to Reset user password 
 
 namespace UnlockUserAD
 {
@@ -15,6 +15,12 @@ namespace UnlockUserAD
     {
         AuditLogManager auditLogManager;
         DateTime todayDate = DateTime.Now;
+
+        public PasswordManager(AuditLogManager auditLogManager)
+        {
+           this.auditLogManager = auditLogManager;
+        }
+
         public void ResetUserPassowrd()
         {
             Console.Write("Enter the username to reset password for: ");
@@ -45,7 +51,7 @@ namespace UnlockUserAD
                                 user.SetPassword(password);
                                 user.Save();
 
-                                string logEntry = $"User \"{user}\" Password has been changed sucessfully at {DateTime.UtcNow}\n";
+                                string logEntry = $"User \"{user}\" Password has been changed sucessfully at {DateTime.Now}\n";
                                 Console.WriteLine(logEntry);
                                 auditLogManager.Log(logEntry);
                             }// end of if statement

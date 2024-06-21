@@ -15,7 +15,7 @@ namespace UnlockUserAD
 
         public ADGroupActionManager(AuditLogManager auditLogManager)
         {
-            //auditLogManager.RedirectConsoleOutput();                                                                                                                   // Comment out if you want to log everything in the console.
+            //auditLogManager.RedirectConsoleOutput();                                                                                                                 // Comment out if you want to log everything in the console ** Does not log password **.
             this.auditLogManager = auditLogManager;
             
         }
@@ -43,7 +43,7 @@ namespace UnlockUserAD
                 if (groupName.ToLower().Trim() == "exit")
                 {
                     isExit = true;
-                    Console.WriteLine($"Returing to menu...");
+                    Console.WriteLine($"\nReturing to menu...");
                     break;
                 }
                 else
@@ -133,7 +133,7 @@ namespace UnlockUserAD
                 if (groupName.ToLower().Trim() == "exit")
                 {
                     isExit = true;
-                    Console.WriteLine($"Returing to menu...");
+                    Console.WriteLine($"\nReturing to menu...");
                     break;
                 }
                 else

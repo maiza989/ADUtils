@@ -12,12 +12,12 @@ namespace UnlockUserAD
 
     public class ActiveDirectoryManager
     {
-        PasswordManager passwordManager = new PasswordManager();
+        PasswordManager passwordManager;
 
         /// <summary>
         /// A method that display a general information about a user.
         /// </summary>
-        /// <param name="context"></param>
+        /// <param name="context">The PrincipalContext to use for querying Active Directory</param>
         public void DisplayUserInfo(PrincipalContext context)
         {
             bool returnToMenu = false;
@@ -41,30 +41,33 @@ namespace UnlockUserAD
                         {
                             userGroups.Add(group.Name);
                         }// end of foreach
-                        string userGroupString = string.Join(", ", userGroups);
+                        string userGroupsString = string.Join(", ", userGroups);
 
                         DirectoryEntry directoryEntry = user.GetUnderlyingObject() as DirectoryEntry;
                         string title = directoryEntry.Properties["title"].Value as string;
                         string department = directoryEntry.Properties["department"].Value as string;
-
-                        DateTime lasBadPasswordAttemptLocal = TimeZoneInfo.ConvertTimeFromUtc(user.LastBadPasswordAttempt.Value.ToUniversalTime(), TimeZoneInfo.Local);
-
-                        Console.WriteLine($"\nFirst name: {user.GivenName}\n" +
-                                          $"Last name: {user.Surname}\n" +
-                                          $"Display name: {user.DisplayName}\n" +
-                                          $"Username: {user.SamAccountName}\n" +
-                                          $"Email: {user.EmailAddress}\n" +
-                                          $"Title: {title}\n" +
-                                          $"Department: {department}\n" +
-                                          $"Member of: {userGroupString}\n" +
+                 
+                        DateTime lastBadPasswordAttemptLocal = TimeZoneInfo.ConvertTimeFromUtc(user.LastBadPasswordAttempt.Value.ToUniversalTime(), TimeZoneInfo.Local);
+                        DateTime lastLogonLocal = TimeZoneInfo.ConvertTimeFromUtc(user.LastLogon.Value.ToUniversalTime(), TimeZoneInfo.Local);
+                        
+                        Console.WriteLine($"\nFirst name: {user.GivenName ?? "N/A"}\n" +
+                                          $"Last name: {user.Surname ?? "N/A"}\n" +
+                                          $"Display name: {user.DisplayName ?? "N/A"}\n" +
+                                          $"Username: {user.SamAccountName ?? "N/A"}\n" +
+                                          $"Email: {user.EmailAddress ?? "N/A"}\n" +
+                                          $"Title: {title ?? "N/A"}\n" +
+                                          $"Department: {department ?? "N/A"}\n" +
+                                          $"Member of: {userGroupsString ?? "N/A"}\n" +
                                           $"Password Last Set: {passwordManager.GetPasswordLastSetDate(user)}\n" +
                                           $"Password Experation Date: {passwordManager.GetPasswordExpirationDate(user)}\n" +
                                           $"Bad Logon Counter: {user.BadLogonCount}\n" +
-                                          $"Last Bad Logon Attempt: {lasBadPasswordAttemptLocal}\n" +
+                                          $"Last Logon: {lastLogonLocal}\n" +
+                                          $"Last Bad Logon Attempt: {lastBadPasswordAttemptLocal}\n" +
                                           $"Account Status: {user.Enabled}\n" +
                                           $"Account Lockout Status: {user.IsAccountLockedOut()}\n" +
-                                          $"Home Directory: {user.HomeDirectory}\n" +
-                                          $"SID: {user.Sid}\n");
+                                          $"Home Directory: {user.HomeDirectory ?? "N/A"}\n" +
+                                          $"SID: {user.Sid}\n" +
+                                          $"");
                                           
                     }// end of if statement
                 }// end of else statement

@@ -14,8 +14,8 @@ class Program
     static string adminUsername, adminPassword;
     static void Main(string[] args)
     {
-        PasswordManager PWDManager = new PasswordManager();
         ActiveDirectoryManager ADManager = new ActiveDirectoryManager();
+        PasswordManager PWDManager = null;
         ADGroupActionManager ADGroupManager = null;
         AuditLogManager auditLogManager = null;
         
@@ -39,6 +39,8 @@ class Program
 
                         auditLogManager = new AuditLogManager(adminUsername);
                         ADGroupManager = new ADGroupActionManager(auditLogManager);
+                        PWDManager = new PasswordManager(auditLogManager);
+
 
                         bool exit = false;
                         while (!exit)                                                                                                                                          // Loop the menu

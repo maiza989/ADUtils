@@ -1,12 +1,13 @@
 ﻿using System;
 using System.IO;
+using System.Security.Cryptography.X509Certificates;
 
 namespace UnlockUserAD
 {
     public class AuditLogManager
     {
-        private static readonly string BaseLogDirectory = @"path/you/want/to/store/your/logs";
-        private readonly string logFilePath;
+        private static readonly string BaseLogDirectory = @"H:\IT\Maitham's Cave\ADUtil\Logs";                                                                                              // Replace with your desire log location 
+        private string logFilePath;
 
         /// <summary>
         /// A constructor that create and ensure the for log file exists.
@@ -25,7 +26,6 @@ namespace UnlockUserAD
                 Console.WriteLine($"Error validating log file: {ex.Message}");
             }// end of catch
         }// end of Auditlog manager constructor
-
         private void InitilizeLogFile()
         {
             File.AppendAllText(logFilePath, $"---------------------------------------------------------------------------------------------------------------------\n" +
