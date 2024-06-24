@@ -12,6 +12,14 @@ class Program
     static bool isLocked = false;
     static int countdownSeconds = 60;
     static string adminUsername, adminPassword;
+
+    static void GetAdminCreditials()
+    {
+        Console.Write("Enter admin username: ");
+        adminUsername = Console.ReadLine().Trim();
+        Console.Write("Enter admin password: ");
+        adminPassword = PasswordManager.GetPassword().Trim();
+    }
     static void Main(string[] args)
     {
         ActiveDirectoryManager ADManager = new ActiveDirectoryManager();
@@ -19,13 +27,9 @@ class Program
         ADGroupActionManager ADGroupManager = null;
         AuditLogManager auditLogManager = null;
         
+        GetAdminCreditials();
         do
         {
-            Console.Write("Enter admin username: ");
-            adminUsername = Console.ReadLine().Trim();
-            Console.Write("Enter admin password: ");
-            adminPassword = PasswordManager.GetPassword().Trim();
-            
             try
             {
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))                                              // Check if the the password/user are correct

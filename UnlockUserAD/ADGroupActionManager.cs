@@ -56,7 +56,7 @@ namespace UnlockUserAD
                         {
 
                             GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName);                                                                   // Check for group in AD
-
+                            
                             if (group != null)
                             {
                                 if (!group.Members.Contains(user))                                                                                                      // If the user is not in the group add him
