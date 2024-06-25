@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
+using System.DirectoryServices.ActiveDirectory;
 using System.IO.Pipes;
 using System.Linq;
 using System.Text;
@@ -16,73 +17,82 @@ namespace UnlockUserAD
 {
     public class AccountCreationManager
     {
+        string myDomain = Environment.GetEnvironmentVariable("MY_DOMAIN");
         Program program;
         private PrincipalContext context;
+
         string firstName;
         string lastName;
         string jobTitle;
         string departmentEntry;
         string description;
+        string targetOU;
+        string firstInitial;
+        string lastInitial;
+        string username;
+        string email;
+        string password;
+        string userProfile;
+        string clsUserFolder;
        
 
 
         public AccountCreationManager() 
         {
-            context = new PrincipalContext(ContextType.Domain);
+            
             program = new Program();    
         }
 
-        public void CreateUserAccount()
+        public void CreateUserAccount(string adminUsername, string adminPassword)
         {
             // Prompt for user details
             Console.Write("Enter new user's first name: ");
             firstName = Console.ReadLine();
 
             Console.Write("Enter new user's last name: ");
-            string lastName = Console.ReadLine();
+            lastName = Console.ReadLine();
 
             Console.Write("Enter user's job title: ");
-            string jobTitle = Console.ReadLine();
+            jobTitle = Console.ReadLine();
 
             Console.Write("Enter user's department: ");
-            string departmentEntry = Console.ReadLine();
+            departmentEntry = Console.ReadLine();
 
             Console.Write("Enter user description: ");
-            string description = Console.ReadLine();
+            description = Console.ReadLine();
 
-            Console.Write("Select New User OU (Admin Staff, Collector, Atty, Acct, IT, Compliance, Michigan_Users, Cooling_Users");
-            string targetOU = Console.ReadLine().Trim();
+            Console.WriteLine("Select New User OU (Admin Staff, Collector, Atty, Acct, IT, Compliance, Michigan_Users, Cooling_Users)");
+            Console.Write("Enter your choice:");
+            targetOU = Console.ReadLine().Trim();
 
             // Generate additional details
-            string firstInitial = Regex.Match(firstName, ".{1,1}").Value.ToLower();
-            string lastInitial = Regex.Match(lastName, ".{1,1}").Value.ToLower();
-            string username = $"{firstInitial}{lastName.ToLower()}";
-            string email = $"{username}@lloydmc.com";
-            string password = $"New_User_lloydmc_{firstInitial}{lastInitial}!";
-
-            
-
-            string userProfile = $@"\\lmnas-02\users\{username}";
-            string clsUserFolder = $@"\\lmcls\sys\users\{firstInitial}{lastName.ToLower()}";
+            firstInitial = Regex.Match(firstName, ".{1,1}").Value;
+            lastInitial = Regex.Match(lastName, ".{1,1}").Value;
+            username = $"{firstInitial.ToLower()}{lastName.ToLower()}";
+            email = $"{username}@lloydmc.com";
+            password = $"New_User_lloydmc_{firstInitial.ToUpper()}{lastInitial.ToUpper()}!";
+            userProfile = $@"\\lmnas-02\users\{username}";
+            clsUserFolder = $@"\\lmcls\sys\users\{firstInitial.ToLower()}{lastName.ToLower()}";
 
 
             Console.WriteLine($"\n-----------------------------------------------------------------------------------" +
-                             $"First Name: {firstName}\n" +
+                             $"\nFirst Name: {firstName}\n" +
                              $"Last Name: {lastName}\n" +
                              $"Display Name: {firstName} {lastName}\n" +
+                             $"Username: {username}\n" +
                              $"Email Address: {email}\n" +
                              $"Temp Password: {password} \n" +
                              $"Department: {departmentEntry} \n" +
                              $"Description: {description} \n" +
                              $"User Assgined OU: {targetOU} \n" +
                              $"User Romaing Folder Location: {userProfile} \n" +
-                             $"CLS Folder Location: {clsUserFolder}" +
+                             $"CLS Folder Location: {clsUserFolder}\n" +
                              $"-----------------------------------------------------------------------------------\n");
            
             bool isExit = false;    
             while (!isExit)
             {
-                Console.Write("Please verify all new user information are correct !!!(Y/N)");
+                Console.Write("Please verify all new user information are correct !!!(Y/N):");
                 string confirmation = Console.ReadLine().ToUpper().Trim();
            
                 if(confirmation == "Y")
@@ -98,35 +108,45 @@ namespace UnlockUserAD
             }// end of while
             try
             {
-                // Create a new UserPrincipal object
-                using (UserPrincipal user = new UserPrincipal(context))
+                string ouPath = $"LDAP://OU={targetOU},DC={myDomain},DC=com";
+
+                using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
                 {
-                    DirectoryEntry directoryEntry = new DirectoryEntry($"LDAP://{targetOU}");
-                  
-                    DirectoryEntry userEntry = directoryEntry.Children.Add($"CN={firstName} {lastName}", "user");                                                   // Create a new DirectoryEntry object for the user
+                    // Create a new UserPrincipal object
+                    using (UserPrincipal user = new UserPrincipal(context))
+                    {
+                        user.Name = $"{firstName} {lastName}";
+                        user.SamAccountName = username;
+                        user.SetPassword(password);
+                        user.GivenName = firstName;
+                        user.Surname = lastName;
+                        user.EmailAddress = email;
+                        user.DisplayName = $"{firstName} {lastName}";
+                        user.ScriptPath = "logon.bat";
+                        user.Description = description;
+                        user.HomeDrive = "P:";
+                        user.HomeDirectory = userProfile;
+                        user.Enabled = true;
+                        user.UserCannotChangePassword = false;
+                        user.PasswordNeverExpires = false;
 
-                    user.SamAccountName = username;
-                    user.SetPassword(password);
-                    user.GivenName = firstName;
-                    user.Surname = lastName;
-                    user.EmailAddress = email;
-                    user.DisplayName = $"{firstName} {lastName}";
-                    user.Description = description;
-                    userEntry.Properties["title"].Value = jobTitle;
-                    userEntry.Properties["department"].Value = departmentEntry;
-                    user.HomeDirectory = userProfile;
-                    user.Enabled = true;
-                    user.UserCannotChangePassword = false;
-                    user.PasswordNeverExpires = false;
+                        user.Save();
 
-                    // Save the new user to Active Directory
-                    userEntry.CommitChanges();
-                    userEntry.Invoke("SetPassword", new object[] {password});
+                        // Move user to the specified OU
+                        using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())
+                        {
+                            //DirectoryEntry currentPath = new DirectoryEntry("LDAP://");
+                            DirectoryEntry newParent = new DirectoryEntry(ouPath, adminUsername, adminPassword);
+                            userEntry.MoveTo(newParent);
+                            userEntry.Properties["title"].Value = jobTitle;
+                            userEntry.Properties["department"].Value = departmentEntry;
+                            userEntry.CommitChanges();
+                        }
 
-                    user.Save();
-                    user.Dispose();
-                    Console.WriteLine($"User account '{username}' created successfully.");
-                }// end of using
+                        user.Dispose();
+                        Console.WriteLine($"User account '{username}' created successfully.");
+                    }// end of using
+                }
                 IsUserCreated(username);
                 AddNewUserToGroups(username, targetOU);
                 CreateCLSFolder(clsUserFolder, username);
@@ -245,7 +265,7 @@ namespace UnlockUserAD
             service.Url = new Uri(exchangeUrl);
             
             // Create Mailbox for the new user
-            //service.EnableMailbox(username, mailboxDatabase);
+        //    service.EnableMailbox(username, mailboxDatabase);
         }
 
     }// end of class

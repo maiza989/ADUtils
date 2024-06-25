@@ -49,12 +49,13 @@ namespace UnlockUserAD
 
                             if (comfirmation == "Y")
                             {
+
                                 user.SetPassword(password);
                                 user.Save();
-
                                 string logEntry = $"User \"{user}\" Password has been changed sucessfully at {DateTime.Now}\n";
                                 Console.WriteLine(logEntry);
                                 auditLogManager.Log(logEntry);
+                                user.Dispose();
                             }// end of if statement
                             else
                             {
@@ -85,6 +86,7 @@ namespace UnlockUserAD
         {
             if(password.Length < 15)
             {
+                Console.WriteLine($"\nThe password \"{password}\" is less than 15 characters!\n");
                 return false;
             }
             else
@@ -94,6 +96,22 @@ namespace UnlockUserAD
                 bool hasDigit = Regex.IsMatch(password, "[0-9]");
                 bool hasSymbol = Regex.IsMatch(password, @"[\W_]");
 
+                if (hasLowerCase == false)
+                {
+                    Console.WriteLine($"\nThe password \"{password}\" does not have lowercase letters!");
+                }
+                if (hasUpperCase == false)
+                {
+                    Console.WriteLine($"\nThe password \"{password}\" does not have uppercase letters!");
+                }
+                if (hasDigit == false)
+                {
+                    Console.WriteLine($"\nThe password \"{password}\" does not have digits!");
+                }
+                if(hasSymbol == false)
+                {
+                    Console.WriteLine($"The password\"{password}\" does not have symbols!");
+                }
                 return hasUpperCase && hasLowerCase && hasDigit && hasSymbol;
             }
         }

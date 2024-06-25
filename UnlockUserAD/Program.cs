@@ -23,6 +23,7 @@ class Program
     static void Main(string[] args)
     {
         ActiveDirectoryManager ADManager = new ActiveDirectoryManager();
+        AccountCreationManager ACManager;
         PasswordManager PWDManager = null;
         ADGroupActionManager ADGroupManager = null;
         AuditLogManager auditLogManager = null;
@@ -44,6 +45,7 @@ class Program
                         auditLogManager = new AuditLogManager(adminUsername);
                         ADGroupManager = new ADGroupActionManager(auditLogManager);
                         PWDManager = new PasswordManager(auditLogManager);
+                        ACManager = new AccountCreationManager();
 
 
                         bool exit = false;
@@ -51,7 +53,7 @@ class Program
                         {
                             DisplayMainMenu();
                             string choice = Console.ReadLine();
-                            exit = HandleMainMenuChoice(choice, context, ADManager, ADGroupManager, PWDManager);
+                            exit = HandleMainMenuChoice(choice, context, ADManager, ADGroupManager, PWDManager, ACManager);
                         }// end of while-loop
                     }// end of if statement
                 }// end of using
@@ -97,7 +99,7 @@ class Program
     /// <param name="ADGroupManager">A class that manage user groups </param>
     /// <param name="PWDManager"> A class that manager user password related events</param>
     /// <returns></returns>
-    static bool HandleMainMenuChoice(string choice, PrincipalContext context, ActiveDirectoryManager ADManager, ADGroupActionManager ADGroupManager, PasswordManager PWDManager)
+    static bool HandleMainMenuChoice(string choice, PrincipalContext context, ActiveDirectoryManager ADManager, ADGroupActionManager ADGroupManager, PasswordManager PWDManager, AccountCreationManager ACManager)
     {
         switch (choice)
         {
@@ -108,7 +110,7 @@ class Program
                 DisplayGroupManagementMenu(context, ADGroupManager);
                 break;
             case "3":
-                DisplayUserInfoMenu(context, ADManager, PWDManager);
+                DisplayUserInfoMenu(context, ADManager, PWDManager, ACManager);
                 break;
             case "4":
                 return true;
@@ -211,7 +213,7 @@ class Program
     /// <param name="context"></param>
     /// <param name="ADManager"></param>
     /// <param name="PWDManager"></param>
-    static void DisplayUserInfoMenu(PrincipalContext context, ActiveDirectoryManager ADManager, PasswordManager PWDManager)
+    static void DisplayUserInfoMenu(PrincipalContext context, ActiveDirectoryManager ADManager, PasswordManager PWDManager, AccountCreationManager ACManager)
     {
         bool exit = false;
         while (!exit)
@@ -221,6 +223,7 @@ class Program
             Console.WriteLine("1. Check User Password Expiration Date");
             Console.WriteLine("2. Display General User Info");
             Console.WriteLine("3. Reset A User Password");
+            Console.WriteLine("4. Create New User Account");
             Console.Write("Enter your choice(Type \"exit\" to return to main menu): ");
 
             string choice = Console.ReadLine().ToLower().Trim();
@@ -234,6 +237,9 @@ class Program
                     break;
                 case "3":
                     PWDManager.ResetUserPassowrd();
+                    break;
+                case "4":
+                    ACManager.CreateUserAccount(adminUsername, adminPassword);
                     break;
                 case "exit":
                     exit = true;
