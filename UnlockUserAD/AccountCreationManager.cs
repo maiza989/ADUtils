@@ -11,6 +11,9 @@ using System.Threading.Tasks;
 using Microsoft.Exchange.WebServices.Data;
 using Task = System.Threading.Tasks.Task;
 using System.Diagnostics;
+using System.Management.Automation;
+using System.Management.Automation.Runspaces;
+using System.Security;
 
 
 // TODO - User Account Creation: Enable users to create new accounts in Active Directory. 
@@ -22,9 +25,7 @@ namespace UnlockUserAD
         string mydomainDotCom = Environment.GetEnvironmentVariable("MY_DOMAIN.COM");
         string myParentOU = Environment.GetEnvironmentVariable("MY_PARENT_OU");
         string myCompany = Environment.GetEnvironmentVariable("MY_COMPANY");
-
-        Program program;
-        private PrincipalContext context;
+        string myExhcangeDatabase = Environment.GetEnvironmentVariable("MY_EXCHANGE_DATABASE");
 
         string firstName;
         string lastName;
@@ -41,13 +42,10 @@ namespace UnlockUserAD
         string password;
         string userProfile;
         string clsUserFolder;
-       
-
 
         public AccountCreationManager() 
         {
-            
-            program = new Program();    
+    
         }
 
         public void CreateUserAccount(string adminUsername, string adminPassword)
@@ -71,8 +69,8 @@ namespace UnlockUserAD
             Console.Write("Enter user office (KY, MI, GA): ");
             office = Console.ReadLine();
 
-            Console.Write("Enter user manager (SAM Account Name): ");
-            manager = Console.ReadLine();
+            /*Console.Write("Enter user manager (SAM Account Name): ");
+            manager = Console.ReadLine();*/
 
             Console.WriteLine("Select New User OU (Admin Staff, Collector, Atty, Acct, IT, Compliance, Michigan_Users, Cooling_Users)");
             Console.Write("Enter your choice:");
@@ -86,7 +84,6 @@ namespace UnlockUserAD
             password = $"New_User_{myCompany}_{firstInitial.ToUpper()}{lastInitial.ToUpper()}!";
             userProfile = $@"\\lmnas-02\users\{username}";
             clsUserFolder = $@"\\lmcls\sys\users\{firstInitial.ToLower()}{lastName.ToLower()}";
-
 
             Console.WriteLine($"\n-----------------------------------------------------------------------------------" +
                              $"\nFirst Name: {firstName}\n" +
@@ -130,7 +127,7 @@ namespace UnlockUserAD
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
                 {
                     
-                    using (UserPrincipal user = new UserPrincipal(context))                                                                     // Creating new User
+                    using (UserPrincipal user = new UserPrincipal(context))                                                                             // Creating new User
                     {
                         user.Name = $"{firstName} {lastName}";
                         user.SamAccountName = username;
@@ -149,7 +146,7 @@ namespace UnlockUserAD
                         user.PasswordNeverExpires = false;
                         user.Save();
 
-                        using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())                                           // Move user to the specified OU
+                        using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())                                                   // Move user to the specified OU
                         {
                             DirectoryEntry startOU = new DirectoryEntry(userEntry.Path);
                             DirectoryEntry endOU = new DirectoryEntry(ouPath, adminUsername, adminPassword);
@@ -161,13 +158,14 @@ namespace UnlockUserAD
                             startOU.MoveTo(endOU);
                         }// end of using
 
-                        Console.WriteLine($"User account '{username}' created successfully!!!");
+                        Console.WriteLine($"User Account '{username}' Created Successfully!!!");
                         user.Dispose();
                     }// end of UserPrincipal using
                 }// end of PrincipalContect using
-                IsUserCreated(username);
-                AddNewUserToGroups(username, targetOU, adminUsername, adminPassword);
-                CreateCLSFolder(clsUserFolder);
+                IsUserCreated(username);                                                                                                                // Verify account is created in AD
+                AddNewUserToGroups(username, targetOU, adminUsername, adminPassword);                                                                   // Add using to basic groups based on select organizational unit (OU)
+                CreateCLSFolder(clsUserFolder);                                                                                                         // Optional: Create CLS folder for new user
+               CreateExchangeMailbox(adminUsername, adminPassword);                                                                                    // Create local Exchange mailbox
             }// end of try
             catch (Exception ex)
             {
@@ -182,24 +180,22 @@ namespace UnlockUserAD
         /// <returns>True if the user exists, false otherwise.</returns>
         private bool IsUserCreated(string username)
         {
-            Task.Delay(3000);
+            Thread.Sleep(1000);
             try
             {
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
                 {
                     UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
-                    Console.WriteLine($"User Account has been verfied: {user.DisplayName}!!!");
+                    Console.WriteLine($"User Account Has Been Verfied: {user.DisplayName}!!!");
                     return user != null;
-                }
-            }
+                }// end of using PrincipalContext 
+            }// end of try
             catch (Exception ex)
             {
                 Console.WriteLine($"Error checking user account existence: {ex.Message}");
                 return false;
-            }
-        }
-
-
+            }// end of catach
+        }// end of IsUserCreated
         /// <summary>
         /// Add the user to the appropriate groups based on the target OU.
         /// </summary>
@@ -207,7 +203,7 @@ namespace UnlockUserAD
         /// <param name="targetOu">The distinguished name of the target OU.</param>
         private void AddNewUserToGroups(string username, string targetOu, string adminUsername, string adminPassword)
         {
-            Task.Delay(3000);
+            Thread.Sleep(1000);
             string[] groups = null;
             string[] itGroups = { "_COLLECT", "_COLLECTKY", "_Training", "IT", "LM_IT" };
             string[] collectorGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Collectors", "LM_Collector", "NoOutboundEmail" };
@@ -237,34 +233,32 @@ namespace UnlockUserAD
                             GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName);
                             if (group != null)
                             {
-                                group.Members.Add(user);
+                                group.Members.Add(user);                                                                                                    // Adding user to groups based on selected OU
                                 group.Save();
-                            }
-                        }
-                        Console.WriteLine($"User '{username}' added to groups: {string.Join(", ", groups)}!!!");
-                        
-                    }
+                            }// end of if statement
+                        }// end of foreach
+                        Console.WriteLine($"User '{username}' added to roups: {string.Join(", ", groups)}!!!");
+                    }// end of if-statement
                     else
                     {
                         Console.WriteLine($"User '{username}' not found for group assignment.");
-                    }
-                }
-            }
+                    }// end of else-statement
+                }// end of using PrincipalContext
+            }// end of if-statement
             else
             {
                 Console.WriteLine($"No group assignments found for the target OU '{targetOu}'");
-            }
+            }// end of else-statement
         }// end of addUserToGroup
         private void CreateCLSFolder(string directoryPath)
         {
-            
+            Thread.Sleep(1000);
             if (!Directory.Exists(directoryPath))
             {
                 try
                 {
                     Directory.CreateDirectory(directoryPath);
                     Console.WriteLine($"CLS folder has been created in: {directoryPath}");
-                    Task.Delay(3000);
                 }// end of try
                 catch(Exception ex)
                 {
@@ -274,28 +268,69 @@ namespace UnlockUserAD
             else
             {
                 Console.WriteLine($"CLS file already Exist for this user: {username}");
-            }
+            }// end of else-statement
         }// end of CreateCLSFolder
 
         private void LaunchBRPMgr()
         {
 
-        }
+        }// end of LaunchBRPMgr
 
         // TODO - create mailbox
-        private void CreateLocalExchangeMailbox(string adminUsername, string adminPassword)
+        private void CreateExchangeMailbox(string adminUsername, string adminPassword)
         {
-            string exchangeUrl = "https://your_exchange_server/EWS/Exchange.asmx";
-            string mailboxDatabase = "";
+            string createMailboxScript = $@"
+                                        New-Mailbox -UserPrincipalName '{email}' 
+                                        -Alias '{username}' 
+                                        -Database '{myExhcangeDatabase}' 
+                                        -Name '{firstName} {lastName}' 
+                                        -Password ConvertTo-SecureString 
+                                        -String '{password}' 
+                                        -AsPlainText -Force)";
 
-        // Authenticate with Exchange Server
-        ExchangeService service = new ExchangeService(ExchangeVersion.Exchange2013_SP1);
-            service.Credentials = new WebCredentials(adminUsername, adminPassword);
-            service.Url = new Uri(exchangeUrl);
-            
-            // Create Mailbox for the new user
-        //    service.EnableMailbox(username, mailboxDatabase);
-        }
+            SecureString secureAdminPassword = new SecureString();
+            foreach(char c in adminPassword.ToCharArray())
+            {
+                secureAdminPassword.AppendChar(c);
+            }
 
+            PSCredential adminCredential = new PSCredential(adminUsername, secureAdminPassword);
+
+
+            using (Runspace runspace = RunspaceFactory.CreateRunspace())
+            {
+                runspace.Open();
+
+                using (PowerShell ps = PowerShell.Create())
+                {
+                    ps.Runspace = runspace;
+                    ps.AddScript($"$adminCredential = New-Object System.Management.Automation.PSCredential ('{adminUsername}', $secureAdminPassword)");
+                    ps.AddScript(createMailboxScript);
+
+                    try
+                    {
+                        var result = ps.Invoke();
+                        if (ps.HadErrors)
+                        {
+                            StringBuilder errorMessage = new StringBuilder("Error creating mailbox: ");
+                            foreach (var error in ps.Streams.Error)
+                            {
+                                errorMessage.AppendLine(error.ToString());
+                            }
+                            Console.WriteLine(errorMessage.ToString());
+                        }// end of if-statement
+                        else
+                        {
+                            Console.WriteLine($"Mailbox created successfully for user '{username}'.");
+                            
+                        }// end of else-statement
+                    }// end of try
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error creating mailbox: {ex.Message}");
+                    }// end of catch
+                }// end of using powershell
+            }// end of using Runspace
+        }// end of CreateExchangeMailbox
     }// end of class
 }// end of namespace
