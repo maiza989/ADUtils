@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Exchange.WebServices.Data;
 using Task = System.Threading.Tasks.Task;
+using System.Diagnostics;
 
 
 // TODO - User Account Creation: Enable users to create new accounts in Active Directory. 
@@ -18,6 +19,10 @@ namespace UnlockUserAD
     public class AccountCreationManager
     {
         string myDomain = Environment.GetEnvironmentVariable("MY_DOMAIN");
+        string mydomainDotCom = Environment.GetEnvironmentVariable("MY_DOMAIN.COM");
+        string myParentOU = Environment.GetEnvironmentVariable("MY_PARENT_OU");
+        string myCompany = Environment.GetEnvironmentVariable("MY_COMPANY");
+
         Program program;
         private PrincipalContext context;
 
@@ -26,6 +31,8 @@ namespace UnlockUserAD
         string jobTitle;
         string departmentEntry;
         string description;
+        string office;
+        string manager;
         string targetOU;
         string firstInitial;
         string lastInitial;
@@ -61,6 +68,12 @@ namespace UnlockUserAD
             Console.Write("Enter user description: ");
             description = Console.ReadLine();
 
+            Console.Write("Enter user office (KY, MI, GA): ");
+            office = Console.ReadLine();
+
+            Console.Write("Enter user manager (SAM Account Name): ");
+            manager = Console.ReadLine();
+
             Console.WriteLine("Select New User OU (Admin Staff, Collector, Atty, Acct, IT, Compliance, Michigan_Users, Cooling_Users)");
             Console.Write("Enter your choice:");
             targetOU = Console.ReadLine().Trim();
@@ -69,8 +82,8 @@ namespace UnlockUserAD
             firstInitial = Regex.Match(firstName, ".{1,1}").Value;
             lastInitial = Regex.Match(lastName, ".{1,1}").Value;
             username = $"{firstInitial.ToLower()}{lastName.ToLower()}";
-            email = $"{username}@lloydmc.com";
-            password = $"New_User_lloydmc_{firstInitial.ToUpper()}{lastInitial.ToUpper()}!";
+            email = $"{username}@{myCompany}.com";
+            password = $"New_User_{myCompany}_{firstInitial.ToUpper()}{lastInitial.ToUpper()}!";
             userProfile = $@"\\lmnas-02\users\{username}";
             clsUserFolder = $@"\\lmcls\sys\users\{firstInitial.ToLower()}{lastName.ToLower()}";
 
@@ -83,9 +96,13 @@ namespace UnlockUserAD
                              $"Email Address: {email}\n" +
                              $"Temp Password: {password} \n" +
                              $"Department: {departmentEntry} \n" +
+                             $"Title: {jobTitle} \n" +
                              $"Description: {description} \n" +
+                             $"Physical Office: {office}" +
                              $"User Assgined OU: {targetOU} \n" +
-                             $"User Romaing Folder Location: {userProfile} \n" +
+                             $"Script Path: logon.bat \n" +
+                             $"Home Drive: P: \n" +
+                             $"User Home Directory: {userProfile} \n" +
                              $"CLS Folder Location: {clsUserFolder}\n" +
                              $"-----------------------------------------------------------------------------------\n");
            
@@ -98,7 +115,7 @@ namespace UnlockUserAD
                 if(confirmation == "Y")
                 {
                     isExit = true;
-                    Console.WriteLine("User information has been verified. \nCreating user...");
+                    Console.WriteLine("User information has been verified. \nCreating user...\n");
                 }// end of if-statemnet
                 else
                 {
@@ -108,15 +125,16 @@ namespace UnlockUserAD
             }// end of while
             try
             {
-                string ouPath = $"LDAP://OU={targetOU},DC={myDomain},DC=com";
+                string ouPath = $"LDAP://OU={targetOU},OU={myParentOU},DC={myDomain},DC={mydomainDotCom}";
 
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
                 {
-                    // Create a new UserPrincipal object
-                    using (UserPrincipal user = new UserPrincipal(context))
+                    
+                    using (UserPrincipal user = new UserPrincipal(context))                                                                     // Creating new User
                     {
                         user.Name = $"{firstName} {lastName}";
                         user.SamAccountName = username;
+                        user.UserPrincipalName = $"{username}@{myCompany}.com";
                         user.SetPassword(password);
                         user.GivenName = firstName;
                         user.Surname = lastName;
@@ -129,27 +147,27 @@ namespace UnlockUserAD
                         user.Enabled = true;
                         user.UserCannotChangePassword = false;
                         user.PasswordNeverExpires = false;
-
                         user.Save();
 
-                        // Move user to the specified OU
-                        using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())
+                        using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())                                           // Move user to the specified OU
                         {
-                            //DirectoryEntry currentPath = new DirectoryEntry("LDAP://");
-                            DirectoryEntry newParent = new DirectoryEntry(ouPath, adminUsername, adminPassword);
-                            userEntry.MoveTo(newParent);
+                            DirectoryEntry startOU = new DirectoryEntry(userEntry.Path);
+                            DirectoryEntry endOU = new DirectoryEntry(ouPath, adminUsername, adminPassword);
                             userEntry.Properties["title"].Value = jobTitle;
                             userEntry.Properties["department"].Value = departmentEntry;
+                            userEntry.Properties["physicalDeliveryOfficeName"].Value = office;
+                            //userEntry.Properties["manager"].Value = manager;
                             userEntry.CommitChanges();
-                        }
+                            startOU.MoveTo(endOU);
+                        }// end of using
 
+                        Console.WriteLine($"User account '{username}' created successfully!!!");
                         user.Dispose();
-                        Console.WriteLine($"User account '{username}' created successfully.");
-                    }// end of using
-                }
+                    }// end of UserPrincipal using
+                }// end of PrincipalContect using
                 IsUserCreated(username);
-                AddNewUserToGroups(username, targetOU);
-                CreateCLSFolder(clsUserFolder, username);
+                AddNewUserToGroups(username, targetOU, adminUsername, adminPassword);
+                CreateCLSFolder(clsUserFolder);
             }// end of try
             catch (Exception ex)
             {
@@ -170,7 +188,7 @@ namespace UnlockUserAD
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
                 {
                     UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
-                    Console.WriteLine($"User Account is created: {user.DisplayName}");
+                    Console.WriteLine($"User Account has been verfied: {user.DisplayName}!!!");
                     return user != null;
                 }
             }
@@ -187,7 +205,7 @@ namespace UnlockUserAD
         /// </summary>
         /// <param name="username">The username of the new user.</param>
         /// <param name="targetOu">The distinguished name of the target OU.</param>
-        private void AddNewUserToGroups(string username, string targetOu)
+        private void AddNewUserToGroups(string username, string targetOu, string adminUsername, string adminPassword)
         {
             Task.Delay(3000);
             string[] groups = null;
@@ -209,7 +227,7 @@ namespace UnlockUserAD
 
             if (groups != null)
             {
-                using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
+                using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
                 {
                     UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
                     if (user != null)
@@ -223,7 +241,7 @@ namespace UnlockUserAD
                                 group.Save();
                             }
                         }
-                        Console.WriteLine($"User '{username}' added to groups: {string.Join(", ", groups)}");
+                        Console.WriteLine($"User '{username}' added to groups: {string.Join(", ", groups)}!!!");
                         
                     }
                     else
@@ -237,15 +255,15 @@ namespace UnlockUserAD
                 Console.WriteLine($"No group assignments found for the target OU '{targetOu}'");
             }
         }// end of addUserToGroup
-        private void CreateCLSFolder(string directoryPath, string foldername)
+        private void CreateCLSFolder(string directoryPath)
         {
-            string fullPath = Path.Combine(directoryPath, foldername);
-            if (!Directory.Exists(fullPath))
+            
+            if (!Directory.Exists(directoryPath))
             {
                 try
                 {
-                    Directory.CreateDirectory(fullPath);
-                    Console.WriteLine($"CLS folder has been created in: {fullPath}");
+                    Directory.CreateDirectory(directoryPath);
+                    Console.WriteLine($"CLS folder has been created in: {directoryPath}");
                     Task.Delay(3000);
                 }// end of try
                 catch(Exception ex)
@@ -253,11 +271,22 @@ namespace UnlockUserAD
                     Console.WriteLine($"An error has occured whie creating CLS folder: {ex.Message}");
                 }// end of catch
             }// end of if-statement
+            else
+            {
+                Console.WriteLine($"CLS file already Exist for this user: {username}");
+            }
         }// end of CreateCLSFolder
+
+        private void LaunchBRPMgr()
+        {
+
+        }
+
+        // TODO - create mailbox
         private void CreateLocalExchangeMailbox(string adminUsername, string adminPassword)
         {
             string exchangeUrl = "https://your_exchange_server/EWS/Exchange.asmx";
-            string mailboxDatabase = "LMEX16DB1";
+            string mailboxDatabase = "";
 
         // Authenticate with Exchange Server
         ExchangeService service = new ExchangeService(ExchangeVersion.Exchange2013_SP1);
