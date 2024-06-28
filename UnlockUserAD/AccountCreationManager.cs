@@ -14,6 +14,8 @@ using System.Diagnostics;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Security;
+using Microsoft.VisualBasic;
+using System.Collections.ObjectModel;
 
 
 // TODO - User Account Creation: Enable users to create new accounts in Active Directory. 
@@ -279,14 +281,7 @@ namespace UnlockUserAD
         // TODO - create mailbox
         private void CreateExchangeMailbox(string adminUsername, string adminPassword)
         {
-            string createMailboxScript = $@"
-                                        New-Mailbox -UserPrincipalName '{email}' 
-                                        -Alias '{username}' 
-                                        -Database '{myExhcangeDatabase}' 
-                                        -Name '{firstName} {lastName}' 
-                                        -Password ConvertTo-SecureString 
-                                        -String '{password}' 
-                                        -AsPlainText -Force)";
+            string createMailboxScript = $@"New-Mailbox -UserPrincipalName '{email}' -Alias '{username}' -Database '{myExhcangeDatabase}' -Name '{firstName} {lastName}' -Password ConvertTo-SecureString -String '{password}' -AsPlainText -Force";
 
             SecureString secureAdminPassword = new SecureString();
             foreach(char c in adminPassword.ToCharArray())
@@ -304,12 +299,22 @@ namespace UnlockUserAD
                 using (PowerShell ps = PowerShell.Create())
                 {
                     ps.Runspace = runspace;
-                    ps.AddScript($"$adminCredential = New-Object System.Management.Automation.PSCredential ('{adminUsername}', $secureAdminPassword)");
+                    ps.AddScript("Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force");
+                    ps.Invoke();
+
+                    
+                    ps.AddScript($"${adminCredential} = New-Object System.Management.Automation.PSCredential ('{adminUsername}', (ConvertTo-SecureString -String '{adminPassword}' -AsPlainText -Force))");
+                    ps.Invoke();
+                
+                    ps.AddScript("Import-Module ExchangeOnlineManagement");
+                    ps.Invoke();
+                    //  ps.AddScript($"{adminCredential} = New-Object System.Management.Automation.PSCredential ('{adminUsername}', ${secureAdminPassword})");
                     ps.AddScript(createMailboxScript);
+                    Collection<PSObject> result = ps.Invoke();
 
                     try
                     {
-                        var result = ps.Invoke();
+                        //var result = ps.Invoke();
                         if (ps.HadErrors)
                         {
                             StringBuilder errorMessage = new StringBuilder("Error creating mailbox: ");
