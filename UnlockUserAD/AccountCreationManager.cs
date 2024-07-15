@@ -1,20 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.DirectoryServices;
+﻿using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
-using System.DirectoryServices.ActiveDirectory;
-using System.IO.Pipes;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using Microsoft.Exchange.WebServices.Data;
-using Task = System.Threading.Tasks.Task;
-using System.Diagnostics;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Security;
-using Microsoft.VisualBasic;
 using System.Collections.ObjectModel;
 
 
@@ -45,9 +34,9 @@ namespace UnlockUserAD
         string userProfile;
         string clsUserFolder;
 
-        public AccountCreationManager() 
+        public AccountCreationManager()
         {
-    
+
         }
 
         public void CreateUserAccount(string adminUsername, string adminPassword)
@@ -104,14 +93,14 @@ namespace UnlockUserAD
                              $"User Home Directory: {userProfile} \n" +
                              $"CLS Folder Location: {clsUserFolder}\n" +
                              $"-----------------------------------------------------------------------------------\n");
-           
-            bool isExit = false;    
+
+            bool isExit = false;
             while (!isExit)
             {
                 Console.Write("Please verify all new user information are correct !!!(Y/N):");
                 string confirmation = Console.ReadLine().ToUpper().Trim();
-           
-                if(confirmation == "Y")
+
+                if (confirmation == "Y")
                 {
                     isExit = true;
                     Console.WriteLine("User information has been verified. \nCreating user...\n");
@@ -128,7 +117,7 @@ namespace UnlockUserAD
 
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
                 {
-                    
+
                     using (UserPrincipal user = new UserPrincipal(context))                                                                             // Creating new User
                     {
                         user.Name = $"{firstName} {lastName}";
@@ -167,7 +156,7 @@ namespace UnlockUserAD
                 IsUserCreated(username);                                                                                                                // Verify account is created in AD
                 AddNewUserToGroups(username, targetOU, adminUsername, adminPassword);                                                                   // Add using to basic groups based on select organizational unit (OU)
                 CreateCLSFolder(clsUserFolder);                                                                                                         // Optional: Create CLS folder for new user
-               CreateExchangeMailbox(adminUsername, adminPassword);                                                                                    // Create local Exchange mailbox
+                CreateExchangeMailbox(adminUsername, adminPassword);                                                                                    // Create local Exchange mailbox
             }// end of try
             catch (Exception ex)
             {
@@ -262,7 +251,7 @@ namespace UnlockUserAD
                     Directory.CreateDirectory(directoryPath);
                     Console.WriteLine($"CLS folder has been created in: {directoryPath}");
                 }// end of try
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Console.WriteLine($"An error has occured whie creating CLS folder: {ex.Message}");
                 }// end of catch
@@ -279,63 +268,133 @@ namespace UnlockUserAD
         }// end of LaunchBRPMgr
 
         // TODO - create mailbox
+        /* private void CreateExchangeMailbox(string adminUsername, string adminPassword)
+         {
+
+             string createMailboxScript = $"New-Mailbox -UserPrincipalName '{email}' -Alias '{username}' -Database '{myExhcangeDatabase}' -Name '{firstName} {lastName}' -Password ConvertTo-SecureString -String '{password}' -AsPlainText -Force";
+
+             SecureString secureAdminPassword = new SecureString();
+             foreach(char c in adminPassword.ToCharArray())
+             {
+                 secureAdminPassword.AppendChar(c);
+             }
+
+             PSCredential adminCredential = new PSCredential(adminUsername, secureAdminPassword);
+
+
+             using (Runspace runspace = RunspaceFactory.CreateRunspace())
+             {
+                 runspace.Open();
+
+                 using (PowerShell ps = PowerShell.Create())
+                 {
+                     ps.Runspace = runspace;
+                     ps.AddScript("Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force");
+                     ps.Invoke();
+
+
+                     ps.AddScript($"$adminCredential = New-Object System.Management.Automation.PSCredential ('{adminUsername}', (ConvertTo-SecureString -String '{adminPassword}' -AsPlainText -Force))");
+                     ps.Invoke();
+
+                     ps.AddScript("Import-Module ExchangeOnlineManagement");
+                     ps.Invoke();
+
+                     ps.AddScript($"Connect-ExchangeOnline -UserPrincipalName '{adminUsername}@lloydmc.com' -Credential (New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList ('{adminUsername}', (ConvertTo-SecureString -String '{adminPassword}' -AsPlainText -Force)))");
+                     ps.Invoke();
+
+                     //  ps.AddScript($"{adminCredential} = New-Object System.Management.Automation.PSCredential ('{adminUsername}', ${secureAdminPassword})");
+                     ps.AddScript(createMailboxScript);
+                     Collection<PSObject> result = ps.Invoke();
+
+                     try
+                     {
+                         //var result = ps.Invoke();
+                         if (ps.HadErrors)
+                         {
+                             StringBuilder errorMessage = new StringBuilder("Error creating mailbox: ");
+                             foreach (var error in ps.Streams.Error)
+                             {
+                                 errorMessage.AppendLine(error.ToString());
+                             }
+                             Console.WriteLine(errorMessage.ToString());
+                         }// end of if-statement
+                         else
+                         {
+                             Console.WriteLine($"Mailbox created successfully for user '{username}'.");
+
+                         }// end of else-statement
+                     }// end of try
+                     catch (Exception ex)
+                     {
+                         Console.WriteLine($"Error creating mailbox: {ex.Message}");
+                     }// end of catch
+                 }// end of using powershell
+             }// end of using Runspace
+         }// end of CreateExchangeMailbox*/
         private void CreateExchangeMailbox(string adminUsername, string adminPassword)
         {
-            string createMailboxScript = $@"New-Mailbox -UserPrincipalName '{email}' -Alias '{username}' -Database '{myExhcangeDatabase}' -Name '{firstName} {lastName}' -Password ConvertTo-SecureString -String '{password}' -AsPlainText -Force";
+            string exchangeServer = Environment.GetEnvironmentVariable("MY_EXCHANGE_SERVER");
 
-            SecureString secureAdminPassword = new SecureString();
-            foreach(char c in adminPassword.ToCharArray())
+            string script = $@"
+                $username = '{username}'
+                $email = '{email}'
+                $firstName = '{firstName}'
+                $lastName = '{lastName}'
+                $database = '{myExhcangeDatabase}'
+                
+                $SecurePassword = ConvertTo-SecureString -String '{adminPassword}' -AsPlainText -Force
+                $AdminCredentials = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList '{adminUsername}', $SecurePassword
+
+                Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn
+
+                New-Mailbox -Name $username -Alias $username -UserPrincipalName $email -SamAccountName $username -FirstName $firstName -LastName $lastName -Database $database -Password (ConvertTo-SecureString -String '{password}' -AsPlainText -Force)
+            ";
+
+            ExecuteCommand(script, exchangeServer, adminUsername, adminPassword);
+        }
+        private void ExecuteCommand(string script, string exchangeServer, string adminUsername, string adminPassword)
+        {
+            SecureString securePassword = new SecureString();
+            foreach (char c in adminPassword)
             {
-                secureAdminPassword.AppendChar(c);
+                securePassword.AppendChar(c);
             }
 
-            PSCredential adminCredential = new PSCredential(adminUsername, secureAdminPassword);
+            PSCredential credential = new PSCredential(adminUsername, securePassword);
 
+            WSManConnectionInfo connectionInfo = new WSManConnectionInfo(
+                new Uri($"http://{exchangeServer}/PowerShell"),
+                "http://schemas.microsoft.com/powershell/Microsoft.Exchange",
+                credential
+            );
 
-            using (Runspace runspace = RunspaceFactory.CreateRunspace())
+            connectionInfo.AuthenticationMechanism = AuthenticationMechanism.Kerberos;
+
+            using (Runspace runspace = RunspaceFactory.CreateRunspace(connectionInfo))
             {
                 runspace.Open();
 
-                using (PowerShell ps = PowerShell.Create())
+                using (PowerShell powerShell = PowerShell.Create())
                 {
-                    ps.Runspace = runspace;
-                    ps.AddScript("Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force");
-                    ps.Invoke();
+                    powerShell.Runspace = runspace;
+                    powerShell.AddScript(script);
 
-                    
-                    ps.AddScript($"${adminCredential} = New-Object System.Management.Automation.PSCredential ('{adminUsername}', (ConvertTo-SecureString -String '{adminPassword}' -AsPlainText -Force))");
-                    ps.Invoke();
-                
-                    ps.AddScript("Import-Module ExchangeOnlineManagement");
-                    ps.Invoke();
-                    //  ps.AddScript($"{adminCredential} = New-Object System.Management.Automation.PSCredential ('{adminUsername}', ${secureAdminPassword})");
-                    ps.AddScript(createMailboxScript);
-                    Collection<PSObject> result = ps.Invoke();
+                    Collection<PSObject> results = powerShell.Invoke();
 
-                    try
+                    if (powerShell.Streams.Error.Count > 0)
                     {
-                        //var result = ps.Invoke();
-                        if (ps.HadErrors)
+                        Console.WriteLine("Errors:");
+                        foreach (var error in powerShell.Streams.Error)
                         {
-                            StringBuilder errorMessage = new StringBuilder("Error creating mailbox: ");
-                            foreach (var error in ps.Streams.Error)
-                            {
-                                errorMessage.AppendLine(error.ToString());
-                            }
-                            Console.WriteLine(errorMessage.ToString());
-                        }// end of if-statement
-                        else
-                        {
-                            Console.WriteLine($"Mailbox created successfully for user '{username}'.");
-                            
-                        }// end of else-statement
-                    }// end of try
-                    catch (Exception ex)
+                            Console.WriteLine(error.ToString());
+                        }
+                    }
+                    else
                     {
-                        Console.WriteLine($"Error creating mailbox: {ex.Message}");
-                    }// end of catch
-                }// end of using powershell
-            }// end of using Runspace
-        }// end of CreateExchangeMailbox
+                        Console.WriteLine("Exchange mailbox created successfully.");
+                    }
+                }
+            }
+        }// end ExecuteCommand
     }// end of class
 }// end of namespace
