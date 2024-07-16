@@ -5,6 +5,7 @@ using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Security;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 
 // TODO - User Account Creation: Enable users to create new accounts in Active Directory. 
@@ -17,6 +18,7 @@ namespace UnlockUserAD
         string myParentOU = Environment.GetEnvironmentVariable("MY_PARENT_OU");
         string myCompany = Environment.GetEnvironmentVariable("MY_COMPANY");
         string myExhcangeDatabase = Environment.GetEnvironmentVariable("MY_EXCHANGE_DATABASE");
+        string myExchangeServer = Environment.GetEnvironmentVariable("MY_EXCHANGE_SERVER");
 
         string firstName;
         string lastName;
@@ -264,137 +266,108 @@ namespace UnlockUserAD
 
         private void LaunchBRPMgr()
         {
-
+            
         }// end of LaunchBRPMgr
 
         // TODO - create mailbox
-        /* private void CreateExchangeMailbox(string adminUsername, string adminPassword)
-         {
+  
+        private SecureString StringToSecureString(string str)
+        {
+            SecureString secureString = new SecureString();
+            foreach (char c in str.ToCharArray())
+            {
+                secureString.AppendChar(c);
+            }// end of foreach
+            secureString.MakeReadOnly();
+            return secureString;
+        }// End of StringToSecureString
 
-             string createMailboxScript = $"New-Mailbox -UserPrincipalName '{email}' -Alias '{username}' -Database '{myExhcangeDatabase}' -Name '{firstName} {lastName}' -Password ConvertTo-SecureString -String '{password}' -AsPlainText -Force";
-
-             SecureString secureAdminPassword = new SecureString();
-             foreach(char c in adminPassword.ToCharArray())
-             {
-                 secureAdminPassword.AppendChar(c);
-             }
-
-             PSCredential adminCredential = new PSCredential(adminUsername, secureAdminPassword);
-
-
-             using (Runspace runspace = RunspaceFactory.CreateRunspace())
-             {
-                 runspace.Open();
-
-                 using (PowerShell ps = PowerShell.Create())
-                 {
-                     ps.Runspace = runspace;
-                     ps.AddScript("Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force");
-                     ps.Invoke();
-
-
-                     ps.AddScript($"$adminCredential = New-Object System.Management.Automation.PSCredential ('{adminUsername}', (ConvertTo-SecureString -String '{adminPassword}' -AsPlainText -Force))");
-                     ps.Invoke();
-
-                     ps.AddScript("Import-Module ExchangeOnlineManagement");
-                     ps.Invoke();
-
-                     ps.AddScript($"Connect-ExchangeOnline -UserPrincipalName '{adminUsername}@lloydmc.com' -Credential (New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList ('{adminUsername}', (ConvertTo-SecureString -String '{adminPassword}' -AsPlainText -Force)))");
-                     ps.Invoke();
-
-                     //  ps.AddScript($"{adminCredential} = New-Object System.Management.Automation.PSCredential ('{adminUsername}', ${secureAdminPassword})");
-                     ps.AddScript(createMailboxScript);
-                     Collection<PSObject> result = ps.Invoke();
-
-                     try
-                     {
-                         //var result = ps.Invoke();
-                         if (ps.HadErrors)
-                         {
-                             StringBuilder errorMessage = new StringBuilder("Error creating mailbox: ");
-                             foreach (var error in ps.Streams.Error)
-                             {
-                                 errorMessage.AppendLine(error.ToString());
-                             }
-                             Console.WriteLine(errorMessage.ToString());
-                         }// end of if-statement
-                         else
-                         {
-                             Console.WriteLine($"Mailbox created successfully for user '{username}'.");
-
-                         }// end of else-statement
-                     }// end of try
-                     catch (Exception ex)
-                     {
-                         Console.WriteLine($"Error creating mailbox: {ex.Message}");
-                     }// end of catch
-                 }// end of using powershell
-             }// end of using Runspace
-         }// end of CreateExchangeMailbox*/
+     
         private void CreateExchangeMailbox(string adminUsername, string adminPassword)
         {
-            string exchangeServer = Environment.GetEnvironmentVariable("MY_EXCHANGE_SERVER");
+            Console.WriteLine("Creating User Mailbox...");
+            Thread.Sleep(1000);
 
-            string script = $@"
-                $username = '{username}'
-                $email = '{email}'
-                $firstName = '{firstName}'
-                $lastName = '{lastName}'
-                $database = '{myExhcangeDatabase}'
-                
-                $SecurePassword = ConvertTo-SecureString -String '{adminPassword}' -AsPlainText -Force
-                $AdminCredentials = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList '{adminUsername}', $SecurePassword
+            SecureString securePassword = StringToSecureString(adminPassword);
+            Runspace runspace = RunspaceFactory.CreateRunspace();
+            runspace.Open();
 
-                Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn
-
-                New-Mailbox -Name $username -Alias $username -UserPrincipalName $email -SamAccountName $username -FirstName $firstName -LastName $lastName -Database $database -Password (ConvertTo-SecureString -String '{password}' -AsPlainText -Force)
-            ";
-
-            ExecuteCommand(script, exchangeServer, adminUsername, adminPassword);
-        }
-        private void ExecuteCommand(string script, string exchangeServer, string adminUsername, string adminPassword)
-        {
-            SecureString securePassword = new SecureString();
-            foreach (char c in adminPassword)
+            using (PowerShell ps = PowerShell.Create())
             {
-                securePassword.AppendChar(c);
-            }
+                ps.Runspace = runspace;
 
-            PSCredential credential = new PSCredential(adminUsername, securePassword);
+                ps.AddCommand("Set-ExecutionPolicy");
+                ps.AddParameter ("ExecutionPolicy", "RemoteSigned");
 
-            WSManConnectionInfo connectionInfo = new WSManConnectionInfo(
-                new Uri($"http://{exchangeServer}/PowerShell"),
-                "http://schemas.microsoft.com/powershell/Microsoft.Exchange",
-                credential
-            );
-
-            connectionInfo.AuthenticationMechanism = AuthenticationMechanism.Kerberos;
-
-            using (Runspace runspace = RunspaceFactory.CreateRunspace(connectionInfo))
-            {
-                runspace.Open();
-
-                using (PowerShell powerShell = PowerShell.Create())
+                ps.Invoke();
+                if (ps.Streams.Error.Count > 0)
                 {
-                    powerShell.Runspace = runspace;
-                    powerShell.AddScript(script);
-
-                    Collection<PSObject> results = powerShell.Invoke();
-
-                    if (powerShell.Streams.Error.Count > 0)
+                    foreach (ErrorRecord error in ps.Streams.Error)
                     {
-                        Console.WriteLine("Errors:");
-                        foreach (var error in powerShell.Streams.Error)
-                        {
-                            Console.WriteLine(error.ToString());
-                        }
+                        Console.WriteLine($"Error creating PSSession: {error.Exception.Message}");
                     }
-                    else
-                    {
-                        Console.WriteLine("Exchange mailbox created successfully.");
-                    }
+                    return;
                 }
-            }
-        }// end ExecuteCommand
+
+                // Construct the New-PSSession command
+                ps.Commands.Clear();
+                ps.AddCommand("New-PSSession");
+                ps.AddParameter("ConfigurationName", "Microsoft.Exchange");
+                ps.AddParameter("ConnectionUri", new Uri($"http://{myExchangeServer}/PowerShell/"));
+                ps.AddParameter("Authentication", "Kerberos");
+                ps.AddParameter("Credential", new PSCredential(adminUsername, securePassword));
+
+                // Invoke New-PSSession to establish a session
+                Collection<PSObject> result = ps.Invoke();
+                if (ps.Streams.Error.Count > 0)
+                {
+                    foreach (ErrorRecord error in ps.Streams.Error)
+                    {
+                        Console.WriteLine($"Error creating PSSession: {error.Exception.Message}");
+                    }
+                    return;
+                }
+
+                // Extract session
+                var sessionId = result[0];
+
+                // Import the session using Import-PSSession
+                ps.Commands.Clear();
+                ps.AddCommand("Import-PSSession");
+                ps.AddParameter("Session", sessionId);
+                ps.AddParameter("DisableNameChecking");
+
+                ps.Invoke();
+                if (ps.Streams.Error.Count > 0)
+                {
+                    foreach (ErrorRecord error in ps.Streams.Error)
+                    {
+                        Console.WriteLine($"Error importing PSSession: {error.Exception.Message}");
+                    }
+                    return;
+                }
+
+                // Enable mailbox using Enable-Mailbox
+                ps.Commands.Clear();
+                ps.AddCommand("Enable-Mailbox");
+                ps.AddParameter("Identity", username);
+                ps.AddParameter("Database", myExhcangeDatabase);
+
+                // Invoke Enable-Mailbox
+                ps.Invoke();
+                if (ps.Streams.Error.Count > 0)
+                {
+                    foreach (ErrorRecord error in ps.Streams.Error)
+                    {
+                        Console.WriteLine($"Error enabling mailbox for '{username}': {error.Exception.Message}");
+                    }
+                    return;
+                }// end of if-statment
+
+                Console.WriteLine($"Mailbox for '{username}' created successfully!!");
+                runspace.Close();
+                runspace.Dispose();
+            }// end of using
+        }// end of CreateExhangeMailbox
     }// end of class
 }// end of namespace
