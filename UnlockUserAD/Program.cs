@@ -45,7 +45,7 @@ class Program
                         auditLogManager = new AuditLogManager(adminUsername);
                         ADGroupManager = new ADGroupActionManager(auditLogManager);
                         PWDManager = new PasswordManager(auditLogManager);
-                        ACManager = new AccountCreationManager();
+                        ACManager = new AccountCreationManager(auditLogManager);
 
 
                         bool exit = false;

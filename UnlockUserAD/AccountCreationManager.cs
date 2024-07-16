@@ -11,8 +11,18 @@ using System.Diagnostics;
 // TODO - User Account Creation: Enable users to create new accounts in Active Directory. 
 namespace UnlockUserAD
 {
+    
     public class AccountCreationManager
     {
+        EmailNotifcationManager emailNotifcation = new EmailNotifcationManager();
+        AuditLogManager auditLogManager;
+
+        public AccountCreationManager(AuditLogManager auditLogManager)
+        {
+            this.auditLogManager = auditLogManager;
+        }
+
+
         string myDomain = Environment.GetEnvironmentVariable("MY_DOMAIN");
         string mydomainDotCom = Environment.GetEnvironmentVariable("MY_DOMAIN.COM");
         string myParentOU = Environment.GetEnvironmentVariable("MY_PARENT_OU");
@@ -35,6 +45,8 @@ namespace UnlockUserAD
         string password;
         string userProfile;
         string clsUserFolder;
+
+        List<string> emailActionLog = new List<string>();
 
         public AccountCreationManager()
         {
@@ -59,15 +71,46 @@ namespace UnlockUserAD
             Console.Write("Enter user description: ");
             description = Console.ReadLine();
 
-            Console.Write("Enter user office (KY, MI, GA): ");
+            Console.Write("Enter user office (KY, MI, GA, or Remote): ");
             office = Console.ReadLine();
 
             /*Console.Write("Enter user manager (SAM Account Name): ");
             manager = Console.ReadLine();*/
 
-            Console.WriteLine("Select New User OU (Admin Staff, Collector, Atty, Acct, IT, Compliance, Michigan_Users, Cooling_Users)");
+            Console.WriteLine("Select New User OU. Enter Number or Full Name (1- IT, 2- Collector, 3- Admin Staff, 4- Atty, 5- Acct, 6- Compliance, 7- Michigan_Users, 8- Cooling_Users)");
             Console.Write("Enter your choice:");
             targetOU = Console.ReadLine().Trim();
+            switch (targetOU)
+            {
+                case "1":
+                    targetOU = "IT";
+                    break;
+                case "2":
+                    targetOU = "Collector";
+                    break;
+                case "3":
+                    targetOU = "Admin Staff";
+                    break;
+                case "4":
+                    targetOU = "Atty";
+                    break;
+                case "5":
+                    targetOU = "Acct";
+                    break;
+                case "6":
+                    targetOU = "Compliance";
+                    break;
+                case "7":
+                    targetOU = "Michigan_Users";
+                    break;
+                case "8":
+                    targetOU = "Cooling_Users";
+                    break;
+                default:
+                    targetOU = "Admin Staff";
+                    break;
+            }// end of switch-case
+
 
             // Generate additional details
             firstInitial = Regex.Match(firstName, ".{1,1}").Value;
@@ -88,7 +131,7 @@ namespace UnlockUserAD
                              $"Department: {departmentEntry} \n" +
                              $"Title: {jobTitle} \n" +
                              $"Description: {description} \n" +
-                             $"Physical Office: {office}" +
+                             $"Physical Office: {office} \n" +
                              $"User Assgined OU: {targetOU} \n" +
                              $"Script Path: logon.bat \n" +
                              $"Home Drive: P: \n" +
@@ -157,13 +200,27 @@ namespace UnlockUserAD
                 }// end of PrincipalContect using
                 IsUserCreated(username);                                                                                                                // Verify account is created in AD
                 AddNewUserToGroups(username, targetOU, adminUsername, adminPassword);                                                                   // Add using to basic groups based on select organizational unit (OU)
-                CreateCLSFolder(clsUserFolder);                                                                                                         // Optional: Create CLS folder for new user
                 CreateExchangeMailbox(adminUsername, adminPassword);                                                                                    // Create local Exchange mailbox
+                CreateCLSFolder(clsUserFolder);                                                                                                         // Optional: Create CLS folder for new user
+                LaunchBRPMgr();                                                                                                                         // Optional: Open BRP manager to create BRP account manually.
+
+                string logEntry = ($"\nNew Account has been created \"{username}\" in Active Directory\n " +
+                                   $"\nNew Exchange MailBox has been created for \"{username}\"\n" +
+                                   $"\nCLS folder has been created for \"{username}\"\n " +
+                                   $"\nBRP account has been ceated for \"{username}\"\n ");
+                emailActionLog.Add(logEntry);
+                auditLogManager.Log(logEntry);
             }// end of try
             catch (Exception ex)
             {
                 Console.WriteLine($"Error creating user account: {ex.Message}");
             }// end of catch
+
+            if (emailActionLog.Count > 0)
+            {
+                string emailBody = string.Join("\n", emailActionLog);
+                emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
+            }// end of if statement
         }// end of CreateUserAccount
 
         /// <summary>
@@ -206,13 +263,13 @@ namespace UnlockUserAD
             string[] complianceGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Compliance" };
             string[] michiganUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "MI_All_Users_Printers" };
 
-            if (targetOu.Contains("IT")) groups = itGroups;
-            else if (targetOu.Contains("Collector")) groups = collectorGroups;
-            else if (targetOu.Contains("Admin Staff")) groups = adminStaffGroups;
-            else if (targetOu.Contains("Atty")) groups = attyGroups;
-            else if (targetOu.Contains("Acct")) groups = acctGroups;
-            else if (targetOu.Contains("Compliance")) groups = complianceGroups;
-            else if (targetOu.Contains("Michigan_Users")) groups = michiganUsersGroups;
+            if (targetOu.Contains("IT") || targetOU.Contains("1")) groups = itGroups;
+            else if (targetOu.Contains("Collector") || targetOU.Contains("2")) groups = collectorGroups;
+            else if (targetOu.Contains("Admin Staff") || targetOU.Contains("3")) groups = adminStaffGroups;
+            else if (targetOu.Contains("Atty") || targetOU.Contains("4")) groups = attyGroups;
+            else if (targetOu.Contains("Acct") || targetOU.Contains("5")) groups = acctGroups;
+            else if (targetOu.Contains("Compliance") || targetOU.Contains("6")) groups = complianceGroups;
+            else if (targetOu.Contains("Michigan_Users") || targetOU.Contains("7")) groups = michiganUsersGroups;
 
             if (groups != null)
             {
@@ -266,7 +323,23 @@ namespace UnlockUserAD
 
         private void LaunchBRPMgr()
         {
+            // Create a new process start info
+            ProcessStartInfo startInfo = new ProcessStartInfo();
+
+            // Set the file name to the path of the executable
+            startInfo.FileName = @"F:\Imaging\BRPUserMgr.exe";
+
             
+            // Start the process
+            try
+            {
+                Process process = Process.Start(startInfo);
+            }
+            catch (Exception ex)
+            {
+                // Handle exceptions
+                Console.WriteLine($"An error occurred while trying to start the process: {ex.Message}");
+            }
         }// end of LaunchBRPMgr
 
         // TODO - create mailbox

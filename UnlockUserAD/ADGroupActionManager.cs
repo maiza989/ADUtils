@@ -26,7 +26,7 @@ namespace UnlockUserAD
         public void AddUserToGroup(PrincipalContext context)
         {
             bool isExit = false;
-            List<string> actionLog = new List<string>();                                                                                                               // Email log list
+            List<string> emailActionLog = new List<string>();                                                                                                               // Email log list
 
             do
             {
@@ -69,7 +69,7 @@ namespace UnlockUserAD
                                     Console.ForegroundColor = ConsoleColor.Gray;
 
                                     string logEntry = ($"\"{user.DisplayName}\" has been Added to \"{groupName}\" group in Active Directory\n");
-                                    actionLog.Add(logEntry);
+                                    emailActionLog.Add(logEntry);
                                     auditLogManager.Log(logEntry);
 
                                 }// end of inner-2 if-statement
@@ -102,9 +102,9 @@ namespace UnlockUserAD
                     }// end of catch
                 }
             } while (!isExit);
-            if(actionLog.Count > 0 )
+            if(emailActionLog.Count > 0 )
             {
-                string emailBody = string.Join("\n", actionLog);
+                string emailBody = string.Join("\n", emailActionLog);
                 emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
             }// end of if statement
         }// end of AddUserToGroup
@@ -116,7 +116,7 @@ namespace UnlockUserAD
         public void RemoveUserToGroup(PrincipalContext context)
         {
             bool isExit = false;
-            List<string> actionLog = new List<string>();
+            List<string> emailActionLog = new List<string>();
 
             do
             {
@@ -160,7 +160,7 @@ namespace UnlockUserAD
                                     Console.ForegroundColor = ConsoleColor.Gray;
 
                                     string logEntry = ($"\"{user.DisplayName}\" has been removed from \"{groupName}\" group in Active Directory\n");
-                                    actionLog.Add(logEntry);
+                                    emailActionLog.Add(logEntry);
                                     auditLogManager.Log(logEntry);
 
                                 }// end of inner-2 if-statement
@@ -195,9 +195,9 @@ namespace UnlockUserAD
                 }
             } while (!isExit);
 
-            if (actionLog.Count > 0)
+            if (emailActionLog.Count > 0)
             {
-                string emailBody = string.Join("\n", actionLog);
+                string emailBody = string.Join("\n", emailActionLog);
                 emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
             }
         }// end of AddUserToGroup
