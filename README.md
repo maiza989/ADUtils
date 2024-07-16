@@ -39,7 +39,8 @@ This C# program allows an admin to perform actions on users in Active Directory 
 #### User Info Manager
 - **Password Expiration:** Display a specific user password expiration date.
 - **User Infromation**: Display gerenal user infromamtion from the Active Direcotry.
-- **Password Reset**: Reset a user password and make sure it meet the requirement for 15 characters, symbols, number, lower and uppper case. 
+- **Password Reset**: Reset a user password and make sure it meet the requirement for 15 characters, symbols, number, lower and uppper case.
+- **Create New User**: Create a new user with default unique password. create a mailbox in your exhcnage server for the user newly created. 
 
 ## Important Notes
 
