@@ -19,7 +19,7 @@ namespace UnlockUserAD
             {
             logFilePath = Path.Combine(BaseLogDirectory, $"{adminUsername}.log");                                                // Create a log file based on the user logged into ADUtil
             Directory.CreateDirectory(BaseLogDirectory);                                                                         // Ensure the directory exist
-            InitilizeLogFile();                                                                                                  // Set append mode 
+            InitilizeLogFile();                                                                                                  // Set append mode.
             }// end of try
             catch (Exception ex)
             {

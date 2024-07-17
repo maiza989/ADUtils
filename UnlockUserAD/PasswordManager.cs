@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 using UnlockUserAD;
 
 
-// TODO - DONE Add feature to Reset user password 
+// TODO - DONE Add feature to Reset user password.
 
 namespace UnlockUserAD
 {

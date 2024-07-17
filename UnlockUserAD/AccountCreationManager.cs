@@ -51,7 +51,7 @@ namespace UnlockUserAD
         List<string> emailActionLog = new List<string>();                                                                // String list that hold email body
 
         /// <summary>
-        /// Create a user in Active Directory based on the information provided by the user
+        /// Create a user in Active Directory based on the information provided by the user.
         /// </summary>
         /// <param name="adminUsername"></param>
         /// <param name="adminPassword"></param>

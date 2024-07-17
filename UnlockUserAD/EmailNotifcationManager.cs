@@ -11,7 +11,7 @@ namespace UnlockUserAD
 {
     public class EmailNotifcationManager
     {
-        string mySTMPServer = Environment.GetEnvironmentVariable("STMP_SERVER");                                                            // Replace with your STMP server
+        string mySTMPServer = Environment.GetEnvironmentVariable("STMP_SERVER");                                                            // Replace with your STMP server.
         string myFromEmail = Environment.GetEnvironmentVariable("MY_FROMEMAIL");                                                            // Replace with your From email
         string myToEmail = Environment.GetEnvironmentVariable("MY_TOEMAIL");                                                                // Replace with your To email
         string myPassword = Environment.GetEnvironmentVariable("MY_PASSWORD");                                                              // Replace with your email password

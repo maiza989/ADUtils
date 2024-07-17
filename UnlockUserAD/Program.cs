@@ -34,7 +34,7 @@ class Program
         GetAdminCreditials();
             try
             {
-                using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))                                              // Check if the the password/user are correct
+                using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))                                               // Check if the the password/user are correct
                 {
                     if (context.ConnectedServer != null)                                                                                                                      // Throw error if the password/username is incorrect        
                     {
