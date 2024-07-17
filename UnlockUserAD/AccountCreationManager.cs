@@ -8,7 +8,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 
 
-// TODO - User Account Creation: Enable users to create new accounts in Active Directory. 
+// TODO - DONE User Account Creation: Enable users to create new accounts in Active Directory. 
 namespace UnlockUserAD
 {
     
@@ -123,21 +123,21 @@ namespace UnlockUserAD
             clsUserFolder = $@"\\lmcls\sys\users\{firstInitial.ToLower()}{lastName.ToLower()}";
 
             Console.WriteLine($"\n-----------------------------------------------------------------------------------" +
-                             $"\nFirst Name: {firstName}\n" +
-                             $"Last Name: {lastName}\n" +
-                             $"Display Name: {firstName} {lastName}\n" +
-                             $"Username: {username}\n" +
-                             $"Email Address: {email}\n" +
-                             $"Temp Password: {password} \n" +
-                             $"Department: {departmentEntry} \n" +
-                             $"Title: {jobTitle} \n" +
-                             $"Description: {description} \n" +
-                             $"Physical Office: {office} \n" +
-                             $"User Assgined OU: {targetOU} \n" +
-                             $"Script Path: logon.bat \n" +
-                             $"Home Drive: P: \n" +
-                             $"User Home Directory: {userProfile} \n" +
-                             $"CLS Folder Location: {clsUserFolder}\n" +
+                             $"\n{"First Name:",-20} {firstName}\n" +
+                             $"{"Last Name:",-20} {lastName}\n" +
+                             $"{"Display Name:",-20} {firstName} {lastName}\n" +
+                             $"{"Username:", -20} {username}\n" +
+                             $"{"Email Address:", -20} {email}\n" + 
+                             $"{"Temp Password:", -20} {password} \n" +
+                             $"{"Department:", -20} {departmentEntry} \n" +
+                             $"{"Title:", -20} {jobTitle} \n" +
+                             $"{"Description:", -20} {description} \n" +
+                             $"{"Physical Office:", -20} {office} \n" +
+                             $"{"User Assgined OU:", -20} {targetOU} \n" +
+                             $"{"Script Path:", -20} logon.bat \n" +
+                             $"{"Home Drive:", -20} P: \n" +
+                             $"{"User Home Directory:", -20} {userProfile} \n" +
+                             $"{"CLS Folder Location:", -20} {clsUserFolder}\n" +
                              $"-----------------------------------------------------------------------------------\n");
 
             bool isExit = false;
@@ -193,7 +193,10 @@ namespace UnlockUserAD
                             startOU.MoveTo(endOU);
                         }// end of using
 
+                        Console.ForegroundColor = ConsoleColor.DarkCyan;
                         Console.WriteLine($"User Account '{username}' Created Successfully!!!");
+                        Console.ForegroundColor = ConsoleColor.Gray;
+
                         user.Dispose();
 
                     }// end of UserPrincipal using
@@ -237,7 +240,11 @@ namespace UnlockUserAD
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
                 {
                     UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
+
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
                     Console.WriteLine($"User Account Has Been Verfied: {user.DisplayName}!!!");
+                    Console.ForegroundColor = ConsoleColor.Gray;
+
                     return user != null;
                 }// end of using PrincipalContext 
             }// end of try
@@ -289,7 +296,10 @@ namespace UnlockUserAD
                                 group.Save();
                             }// end of if statement
                         }// end of foreach
+
+                        Console.ForegroundColor = ConsoleColor.DarkCyan;
                         Console.WriteLine($"User '{username}' added to roups: {string.Join(", ", groups)}!!!");
+                        Console.ForegroundColor = ConsoleColor.Gray;
                     }// end of if-statement
                     else
                     {
@@ -315,7 +325,9 @@ namespace UnlockUserAD
                 try
                 {
                     Directory.CreateDirectory(directoryPath);
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
                     Console.WriteLine($"CLS folder has been created in: {directoryPath}");
+                    Console.ForegroundColor = ConsoleColor.Gray;
                 }// end of try
                 catch (Exception ex)
                 {
@@ -324,29 +336,16 @@ namespace UnlockUserAD
             }// end of if-statement
             else
             {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
                 Console.WriteLine($"CLS file already Exist for this user: {username}");
+                Console.ForegroundColor = ConsoleColor.Gray;
             }// end of else-statement
         }// end of CreateCLSFolder
 
         /// <summary>
         /// Open BRP manager to create a BRP account for the new user manually.
         /// </summary>
-        private void LaunchBRPMgr()
-        {
-            Console.WriteLine($"Please create account in BRPMgr for the new user MANUALLY!!!\nOpening BRP manager...");
-            Thread.Sleep(processSleepTimer);
-            ProcessStartInfo startInfo = new ProcessStartInfo();                                                                                    // Create a new process start info
-            startInfo.FileName = @"F:\Imaging\BRPUserMgr.exe";                                                                                      // Set the file name to the path of the executable
-
-            try
-            {
-                Process process = Process.Start(startInfo);                                                                                         // Start the process
-            }// end of try
-            catch (Exception ex)
-            { 
-                Console.WriteLine($"An error occurred while trying to start the process: {ex.Message}");
-            }// end of catch
-        }// end of LaunchBRPMgr
+       
 
         // TODO - DONE create mailbox
 
@@ -378,7 +377,9 @@ namespace UnlockUserAD
             {
                 foreach (ErrorRecord error in ps.Streams.Error)
                 {
+                    Console.ForegroundColor = ConsoleColor.DarkRed;
                     Console.WriteLine($"Error {action}: {error.Exception.Message}");
+                    Console.ForegroundColor = ConsoleColor.Gray;
                 }// end of foreach
                 return true;
             }// end of if-statement
@@ -394,8 +395,8 @@ namespace UnlockUserAD
         {
             Console.WriteLine("Creating User Mailbox...");
             Thread.Sleep(processSleepTimer);
-
             SecureString securePassword = StringToSecureString(adminPassword);
+
             Runspace runspace = RunspaceFactory.CreateRunspace();
             runspace.Open();
 
@@ -403,6 +404,7 @@ namespace UnlockUserAD
             {
                 ps.Runspace = runspace;
 
+                // Set Execution Policy
                 ps.AddCommand("Set-ExecutionPolicy");
                 ps.AddParameter ("ExecutionPolicy", "RemoteSigned");
 
@@ -443,10 +445,39 @@ namespace UnlockUserAD
                 ps.Invoke();
                 if (HandlePowershellErrors(ps, $"enabling mailbox for '{username}'")) return;
 
+                Console.ForegroundColor = ConsoleColor.DarkCyan;
                 Console.WriteLine($"Mailbox for '{username}' created successfully!!");
+                Console.ForegroundColor = ConsoleColor.Gray;
+
                 runspace.Close();
                 runspace.Dispose();
             }// end of using
         }// end of CreateExhangeMailbox
+        private void LaunchBRPMgr()
+        {
+            Console.WriteLine($"Please create account in BRPMgr for the new user MANUALLY!!!\nOpening BRP manager...");
+            Thread.Sleep(processSleepTimer);
+            ProcessStartInfo startInfo = new ProcessStartInfo();                                                                                    // Create a new process start info
+            startInfo.FileName = @"F:\Imaging\BRPUserMgr.exe";                                                                                      // Set the file name to the path of the executable
+
+            try
+            {
+                Process process = Process.Start(startInfo);                                                                                         // Start the process
+            }// end of try
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while trying to start the process: {ex.Message}");
+            }// end of catch
+        }// end of LaunchBRPMgr
+
+        static void AnimateLine(string line)
+        {
+            foreach (char c in line)
+            {
+                Console.Write(c);
+                Thread.Sleep(10); // Adjust delay for speed of animation
+            }
+            Console.WriteLine();
+        }
     }// end of class
 }// end of namespace
