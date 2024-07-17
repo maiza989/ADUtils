@@ -12,6 +12,7 @@ class Program
     static bool isLocked = false;
     static int countdownSeconds = 60;
     static string adminUsername, adminPassword;
+    static private bool isAuthenticated = false;
 
     static void GetAdminCreditials()
     {
@@ -28,15 +29,16 @@ class Program
         ADGroupActionManager ADGroupManager = null;
         AuditLogManager auditLogManager = null;
         
-        GetAdminCreditials();
         do
         {
+        GetAdminCreditials();
             try
             {
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))                                              // Check if the the password/user are correct
                 {
-                    if(context.ConnectedServer != null)                                                                                                                      // Throw error if the password/username is incorrect        
+                    if (context.ConnectedServer != null)                                                                                                                      // Throw error if the password/username is incorrect        
                     {
+                        isAuthenticated = true;
 
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine($"Connected to Active Directory as: {adminUsername}.");
@@ -56,6 +58,7 @@ class Program
                             exit = HandleMainMenuChoice(choice, context, ADManager, ADGroupManager, PWDManager, ACManager);
                         }// end of while-loop
                     }// end of if statement
+                    context.Dispose();
                 }// end of using
             }// end of Try-Catch
             catch (DirectoryServicesCOMException)                                                                                                                              // Error out if password/username are incorrect
@@ -63,7 +66,6 @@ class Program
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("Error: Unable to connect to the Active Directory server. Please check your credentials and try again.");
                 Console.ForegroundColor = ConsoleColor.Gray;
-                adminPassword = "";                                                                                                                                            // Clear password if incorrect
             }
             catch (Exception ex)
             {
@@ -71,7 +73,7 @@ class Program
                 Console.WriteLine($"An error occurred: {ex.Message}");
                 Console.ForegroundColor = ConsoleColor.Gray;
             }// end of Catch
-        } while (string.IsNullOrEmpty(adminPassword));                                                                                                                         // Repeat until a valid password is entered
+        } while (!isAuthenticated && string.IsNullOrEmpty(adminUsername));                                                                                                                                            // Repeat until a valid password is entered
     }// end of Main Method
 
 

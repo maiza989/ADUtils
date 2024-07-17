@@ -377,7 +377,7 @@ namespace UnlockUserAD
                 {
                     foreach (ErrorRecord error in ps.Streams.Error)
                     {
-                        Console.WriteLine($"Error creating PSSession: {error.Exception.Message}");
+                        Console.WriteLine($"Error setting excuetion Policy: {error.Exception.Message}");
                     }
                     return;
                 }
