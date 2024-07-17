@@ -22,6 +22,9 @@ namespace UnlockUserAD
            this.auditLogManager = auditLogManager;
         }
 
+        /// <summary>
+        /// A method used to reset a user password.
+        /// </summary>
         public void ResetUserPassowrd()
         {
             Console.Write("Enter the username to reset password for: ");
@@ -82,6 +85,12 @@ namespace UnlockUserAD
             }// end of catch
         }// end of ReserUserPassword
 
+        /// <summary>
+        /// A method that vailidate the password meet the requirement of: 
+        ///            15 Characters, Symbols, Number, Lower and upper case.
+        /// </summary>
+        /// <param name="password"></param>
+        /// <returns></returns>
         private bool IsPasswordVaild(string password)
         {
             if(password.Length < 15)

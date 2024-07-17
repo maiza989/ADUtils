@@ -21,14 +21,16 @@ namespace UnlockUserAD
         {
             this.auditLogManager = auditLogManager;
         }
+        public AccountCreationManager(){}
 
+        string myDomain = Environment.GetEnvironmentVariable("MY_DOMAIN");                                              // Update with your domain
+        string mydomainDotCom = Environment.GetEnvironmentVariable("MY_DOMAIN.COM");                                    // Update with your second part of your domain (domain(.com))
+        string myParentOU = Environment.GetEnvironmentVariable("MY_PARENT_OU");                                         // Update with your path of Users OU
+        string myCompany = Environment.GetEnvironmentVariable("MY_COMPANY");                                            // Update with your company email domain (*@companyName.com)
+        string myExhcangeDatabase = Environment.GetEnvironmentVariable("MY_EXCHANGE_DATABASE");                         // Update with your Exchange server database
+        string myExchangeServer = Environment.GetEnvironmentVariable("MY_EXCHANGE_SERVER");                             // Update with your exchange server name.
 
-        string myDomain = Environment.GetEnvironmentVariable("MY_DOMAIN");
-        string mydomainDotCom = Environment.GetEnvironmentVariable("MY_DOMAIN.COM");
-        string myParentOU = Environment.GetEnvironmentVariable("MY_PARENT_OU");
-        string myCompany = Environment.GetEnvironmentVariable("MY_COMPANY");
-        string myExhcangeDatabase = Environment.GetEnvironmentVariable("MY_EXCHANGE_DATABASE");
-        string myExchangeServer = Environment.GetEnvironmentVariable("MY_EXCHANGE_SERVER");
+        int processSleepTimer = 1000;
 
         string firstName;
         string lastName;
@@ -46,13 +48,13 @@ namespace UnlockUserAD
         string userProfile;
         string clsUserFolder;
 
-        List<string> emailActionLog = new List<string>();
+        List<string> emailActionLog = new List<string>();                                                                // String list that hold email body
 
-        public AccountCreationManager()
-        {
-
-        }
-
+        /// <summary>
+        /// Create a user in Active Directory based on the information provided by the user
+        /// </summary>
+        /// <param name="adminUsername"></param>
+        /// <param name="adminPassword"></param>
         public void CreateUserAccount(string adminUsername, string adminPassword)
         {
             // Prompt for user details
@@ -111,7 +113,6 @@ namespace UnlockUserAD
                     break;
             }// end of switch-case
 
-
             // Generate additional details
             firstInitial = Regex.Match(firstName, ".{1,1}").Value;
             lastInitial = Regex.Match(lastName, ".{1,1}").Value;
@@ -159,11 +160,9 @@ namespace UnlockUserAD
             try
             {
                 string ouPath = $"LDAP://OU={targetOU},OU={myParentOU},DC={myDomain},DC={mydomainDotCom}";
-
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
                 {
-
-                    using (UserPrincipal user = new UserPrincipal(context))                                                                             // Creating new User
+                    using (UserPrincipal user = new UserPrincipal(context))                                                                     // Creating new User
                     {
                         user.Name = $"{firstName} {lastName}";
                         user.SamAccountName = username;
@@ -182,7 +181,7 @@ namespace UnlockUserAD
                         user.PasswordNeverExpires = false;
                         user.Save();
 
-                        using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())                                                   // Move user to the specified OU
+                        using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())                                           // Move user to the specified OU
                         {
                             DirectoryEntry startOU = new DirectoryEntry(userEntry.Path);
                             DirectoryEntry endOU = new DirectoryEntry(ouPath, adminUsername, adminPassword);
@@ -196,18 +195,20 @@ namespace UnlockUserAD
 
                         Console.WriteLine($"User Account '{username}' Created Successfully!!!");
                         user.Dispose();
+
                     }// end of UserPrincipal using
                 }// end of PrincipalContect using
-                IsUserCreated(username);                                                                                                                // Verify account is created in AD
-                AddNewUserToGroups(username, targetOU, adminUsername, adminPassword);                                                                   // Add using to basic groups based on select organizational unit (OU)
-                CreateExchangeMailbox(adminUsername, adminPassword);                                                                                    // Create local Exchange mailbox
-                CreateCLSFolder(clsUserFolder);                                                                                                         // Optional: Create CLS folder for new user
-                LaunchBRPMgr();                                                                                                                         // Optional: Open BRP manager to create BRP account manually.
 
-                string logEntry = ($"\nNew Account has been created \"{username}\" in Active Directory\n " +
-                                   $"\nNew Exchange MailBox has been created for \"{username}\"\n" +
-                                   $"\nCLS folder has been created for \"{username}\"\n " +
-                                   $"\nBRP account has been ceated for \"{username}\"\n ");
+                IsUserCreated(username);                                                                                                        // Verify account is created in AD
+                AddNewUserToGroups(username, targetOU, adminUsername, adminPassword);                                                           // Add using to basic groups based on select organizational unit (OU)
+                CreateExchangeMailbox(adminUsername, adminPassword);                                                                            // Create local Exchange mailbox
+                CreateCLSFolder(clsUserFolder);                                                                                                 // Optional: Create CLS folder for new user
+                LaunchBRPMgr();                                                                                                                 // Optional: Open BRP manager to create BRP account manually.
+
+                string logEntry = ($"New Account has been created \"{firstName} {lastName} | {username}\" in Active Directory\n " +
+                                   $"\nNew Exchange MailBox has been created for \"{firstName} {lastName} | {username}\"\n" +
+                                   $"\nNew CLS folder has been created for \"{firstName} {lastName} | {username}\"\n " +
+                                   $"\nNew BRP account has been ceated for \"{firstName} {lastName} | {username}\"\n ");
                 emailActionLog.Add(logEntry);
                 auditLogManager.Log(logEntry);
             }// end of try
@@ -230,7 +231,7 @@ namespace UnlockUserAD
         /// <returns>True if the user exists, false otherwise.</returns>
         private bool IsUserCreated(string username)
         {
-            Thread.Sleep(1000);
+            Thread.Sleep(processSleepTimer);
             try
             {
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
@@ -246,6 +247,7 @@ namespace UnlockUserAD
                 return false;
             }// end of catach
         }// end of IsUserCreated
+
         /// <summary>
         /// Add the user to the appropriate groups based on the target OU.
         /// </summary>
@@ -253,7 +255,7 @@ namespace UnlockUserAD
         /// <param name="targetOu">The distinguished name of the target OU.</param>
         private void AddNewUserToGroups(string username, string targetOu, string adminUsername, string adminPassword)
         {
-            Thread.Sleep(1000);
+            Thread.Sleep(processSleepTimer);
             string[] groups = null;
             string[] itGroups = { "_COLLECT", "_COLLECTKY", "_Training", "IT", "LM_IT" };
             string[] collectorGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Collectors", "LM_Collector", "NoOutboundEmail" };
@@ -300,9 +302,14 @@ namespace UnlockUserAD
                 Console.WriteLine($"No group assignments found for the target OU '{targetOu}'");
             }// end of else-statement
         }// end of addUserToGroup
+
+        /// <summary>
+        /// Create a CLS folder in desired location
+        /// </summary>
+        /// <param name="directoryPath"></param>
         private void CreateCLSFolder(string directoryPath)
         {
-            Thread.Sleep(1000);
+            Thread.Sleep(processSleepTimer);
             if (!Directory.Exists(directoryPath))
             {
                 try
@@ -321,29 +328,33 @@ namespace UnlockUserAD
             }// end of else-statement
         }// end of CreateCLSFolder
 
+        /// <summary>
+        /// Open BRP manager to create a BRP account for the new user manually.
+        /// </summary>
         private void LaunchBRPMgr()
         {
-            // Create a new process start info
-            ProcessStartInfo startInfo = new ProcessStartInfo();
+            Console.WriteLine($"Please create account in BRPMgr for the new user MANUALLY!!!\nOpening BRP manager...");
+            Thread.Sleep(processSleepTimer);
+            ProcessStartInfo startInfo = new ProcessStartInfo();                                                                                    // Create a new process start info
+            startInfo.FileName = @"F:\Imaging\BRPUserMgr.exe";                                                                                      // Set the file name to the path of the executable
 
-            // Set the file name to the path of the executable
-            startInfo.FileName = @"F:\Imaging\BRPUserMgr.exe";
-
-            
-            // Start the process
             try
             {
-                Process process = Process.Start(startInfo);
-            }
+                Process process = Process.Start(startInfo);                                                                                         // Start the process
+            }// end of try
             catch (Exception ex)
-            {
-                // Handle exceptions
+            { 
                 Console.WriteLine($"An error occurred while trying to start the process: {ex.Message}");
-            }
+            }// end of catch
         }// end of LaunchBRPMgr
 
-        // TODO - create mailbox
-  
+        // TODO - DONE create mailbox
+
+        /// <summary>
+        /// A method that convert a string to a secure string.
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
         private SecureString StringToSecureString(string str)
         {
             SecureString secureString = new SecureString();
@@ -355,11 +366,34 @@ namespace UnlockUserAD
             return secureString;
         }// End of StringToSecureString
 
-     
+        /// <summary>
+        /// A method that prints our error from running powershell commands if any.
+        /// </summary>
+        /// <param name="ps"></param>
+        /// <param name="action"></param>
+        /// <returns></returns>
+        private bool HandlePowershellErrors(PowerShell ps, string action)
+        {
+            if (ps.Streams.Error.Count > 0)
+            {
+                foreach (ErrorRecord error in ps.Streams.Error)
+                {
+                    Console.WriteLine($"Error {action}: {error.Exception.Message}");
+                }// end of foreach
+                return true;
+            }// end of if-statement
+            return false;
+        }// end of HandlePowershellErrors
+
+        /// <summary>
+        /// A method that runs mutliple powershell commands to create a mailbox the Exchange server.
+        /// </summary>
+        /// <param name="adminUsername"></param>
+        /// <param name="adminPassword"></param>
         private void CreateExchangeMailbox(string adminUsername, string adminPassword)
         {
             Console.WriteLine("Creating User Mailbox...");
-            Thread.Sleep(1000);
+            Thread.Sleep(processSleepTimer);
 
             SecureString securePassword = StringToSecureString(adminPassword);
             Runspace runspace = RunspaceFactory.CreateRunspace();
@@ -373,14 +407,7 @@ namespace UnlockUserAD
                 ps.AddParameter ("ExecutionPolicy", "RemoteSigned");
 
                 ps.Invoke();
-                if (ps.Streams.Error.Count > 0)
-                {
-                    foreach (ErrorRecord error in ps.Streams.Error)
-                    {
-                        Console.WriteLine($"Error setting excuetion Policy: {error.Exception.Message}");
-                    }
-                    return;
-                }
+                if (HandlePowershellErrors(ps, "setting execution policy")) return;
 
                 // Construct the New-PSSession command
                 ps.Commands.Clear();
@@ -392,14 +419,7 @@ namespace UnlockUserAD
 
                 // Invoke New-PSSession to establish a session
                 Collection<PSObject> result = ps.Invoke();
-                if (ps.Streams.Error.Count > 0)
-                {
-                    foreach (ErrorRecord error in ps.Streams.Error)
-                    {
-                        Console.WriteLine($"Error creating PSSession: {error.Exception.Message}");
-                    }
-                    return;
-                }
+                if (HandlePowershellErrors(ps, "creating PSSession")) return;
 
                 // Extract session
                 var sessionId = result[0];
@@ -411,14 +431,7 @@ namespace UnlockUserAD
                 ps.AddParameter("DisableNameChecking");
 
                 ps.Invoke();
-                if (ps.Streams.Error.Count > 0)
-                {
-                    foreach (ErrorRecord error in ps.Streams.Error)
-                    {
-                        Console.WriteLine($"Error importing PSSession: {error.Exception.Message}");
-                    }
-                    return;
-                }
+                if (HandlePowershellErrors(ps, "importing PSSession")) return;
 
                 // Enable mailbox using Enable-Mailbox
                 ps.Commands.Clear();
@@ -428,14 +441,7 @@ namespace UnlockUserAD
 
                 // Invoke Enable-Mailbox
                 ps.Invoke();
-                if (ps.Streams.Error.Count > 0)
-                {
-                    foreach (ErrorRecord error in ps.Streams.Error)
-                    {
-                        Console.WriteLine($"Error enabling mailbox for '{username}': {error.Exception.Message}");
-                    }
-                    return;
-                }// end of if-statment
+                if (HandlePowershellErrors(ps, $"enabling mailbox for '{username}'")) return;
 
                 Console.WriteLine($"Mailbox for '{username}' created successfully!!");
                 runspace.Close();

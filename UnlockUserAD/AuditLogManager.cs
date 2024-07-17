@@ -6,7 +6,7 @@ namespace UnlockUserAD
 {
     public class AuditLogManager
     {
-        private static readonly string BaseLogDirectory = @"H:\IT\Maitham's Cave\ADUtil\Logs";                                                                                              // Replace with your desire log location 
+        private static readonly string BaseLogDirectory = @"H:\IT\Maitham's Cave\ADUtil\Logs";                                   // Replace with your desire log location 
         private string logFilePath;
 
         /// <summary>
@@ -17,9 +17,9 @@ namespace UnlockUserAD
         {
             try
             {
-            logFilePath = Path.Combine(BaseLogDirectory, $"{adminUsername}.log");                                                                                                           // Create a log file based on the user logged into ADUtil
-            Directory.CreateDirectory(BaseLogDirectory);                                                                                                                                    // Ensure the directory exist
-            InitilizeLogFile();                                                                                                                                                             // Set append mode 
+            logFilePath = Path.Combine(BaseLogDirectory, $"{adminUsername}.log");                                                // Create a log file based on the user logged into ADUtil
+            Directory.CreateDirectory(BaseLogDirectory);                                                                         // Ensure the directory exist
+            InitilizeLogFile();                                                                                                  // Set append mode 
             }// end of try
             catch (Exception ex)
             {
@@ -48,12 +48,11 @@ namespace UnlockUserAD
             string logEntry = $"{DateTime.Now}: {message}\n";
             try
             {
-                File.AppendAllText(logFilePath, logEntry);
+                File.AppendAllText(logFilePath, logEntry);                                                                     // Write the log message to the file.
             }// end of try
             catch (Exception ex)
             {
                 Console.WriteLine($"Error writing to log file: {ex.Message}");
-                // Optionally rethrow or handle the exception as needed
             }// end of catch
         }// end of log
 
