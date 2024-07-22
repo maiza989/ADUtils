@@ -9,6 +9,9 @@ This C# program allows an admin to perform actions on users in Active Directory 
 - .NET Framework installed.
 - System.DirectoryServices.AccountManagement.
 - ActiveDs library.
+- Pastel libaray.
+- .Net Mail.
+- Powershell 7.4.3 / Runspace
 - Access to an Active Directory environment.
 
 ## How to Use
