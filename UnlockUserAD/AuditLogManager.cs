@@ -2,7 +2,7 @@
 using System.IO;
 using System.Security.Cryptography.X509Certificates;
 
-namespace UnlockUserAD
+namespace ADUtils
 {
     public class AuditLogManager
     {

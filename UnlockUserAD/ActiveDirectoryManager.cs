@@ -3,11 +3,13 @@ using System.Data;
 using System.Diagnostics;
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
-using UnlockUserAD;
+using ADUtils;
 using System.Diagnostics;
 using System.Linq;
+using Pastel;
+using System.Drawing;
 
-namespace UnlockUserAD
+namespace ADUtils
 {
 
     public class ActiveDirectoryManager
@@ -25,7 +27,7 @@ namespace UnlockUserAD
             List<string> userGroups = new List<string>();
             do
             {
-                Console.Write("Enter the username to display info about (type 'exit' to return to the main menu): ");
+                Console.Write($"Enter the username to display info about (Type {"'exit'".Pastel(Color.MediumPurple)} to return to the main menu): ");
                 string username = Console.ReadLine().Trim().ToLower();
 
                 if (username.ToLower().Trim() == "exit")
@@ -84,7 +86,7 @@ namespace UnlockUserAD
             bool returnToMenu = false;
             do
             {
-                Console.Write("Enter the username to unlock (type 'exit' to return to the main menu): ");
+                Console.Write($"Enter the username to unlock (type {"'exit'".Pastel(Color.MediumPurple)} to return to the main menu): ");
                 string username = Console.ReadLine().Trim().ToLower();
 
                 if (username.ToLower().Trim() == "exit")
@@ -104,28 +106,20 @@ namespace UnlockUserAD
                                 Console.ForegroundColor = ConsoleColor.Green;
                                 Console.WriteLine($"\tUser account '{username}' has been unlocked.");
                                 Console.ForegroundColor = ConsoleColor.Gray;
-                                
                             }// end of inner-if-statement
                             else
-                            {
-                                Console.ForegroundColor = ConsoleColor.DarkRed;
-                                Console.WriteLine($"\tUser account '{username}' is not locked.");
-                                Console.ForegroundColor = ConsoleColor.Gray;
+                            {                               
+                                Console.WriteLine($"\tUser account '{username}' is not locked.".Pastel(Color.OrangeRed));
                             }// end of else-statement
                         }// end of Outter-if-statement
                         else
                         {
-                            Console.ForegroundColor = ConsoleColor.DarkRed;
-                            Console.WriteLine($"\tUser account '{username}' not found in Active Directory.");
-                            Console.ForegroundColor = ConsoleColor.Gray;
-
+                            Console.WriteLine($"\tUser account '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
                         }// end of else-statement
                     }// end of Try-Catch
                     catch (Exception ex)
                     {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"Error Unlocking a user: {ex.Message}");
-                        Console.ForegroundColor = ConsoleColor.Gray;
+                        Console.WriteLine($"Error Unlocking a user: {ex.Message}".Pastel(Color.IndianRed));
                     }// end of catch
                 }// end of else
             } while (!returnToMenu);
@@ -148,30 +142,22 @@ namespace UnlockUserAD
                     if (user != null && user.IsAccountLockedOut())                                                                             // If-statement to unlock all users
                     {
                         user.UnlockAccount();
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"\tUser account '{user.SamAccountName}' has been unlocked.");
-                        Console.ForegroundColor = ConsoleColor.Gray;
+                        Console.WriteLine($"\tUser account '{user.SamAccountName}' has been unlocked.".Pastel(Color.LimeGreen));
                         anyUnlocked = true;
                     }// end of if-statement
                 }// end of foreach
                 if (!anyUnlocked)                                                                                                              // If-Else statement to check if any user were unlocked and print appropriate response.
                 {
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine("\tNo user accounts were locked.");
-                    Console.ForegroundColor = ConsoleColor.Gray;
+                    Console.WriteLine("\tNo user accounts were locked.".Pastel(Color.DarkGoldenrod));
                 }// end of if-statement
                 else
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkCyan;
-                    Console.WriteLine("\nAll user accounts have been unlocked successfully.");
-                    Console.ForegroundColor = ConsoleColor.Gray;
+                {  
+                    Console.WriteLine("\nAll user accounts have been unlocked successfully.".Pastel(Color.DarkCyan));
                 }// end of else-statement
             }// end of Try-Catch
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Error: {ex.Message}");
-                Console.ForegroundColor = ConsoleColor.Gray;
+                Console.WriteLine($"Error: {ex.Message}".Pastel(Color.IndianRed));
             }// end of Catch
         }// end of UnlockAllUsers
 
@@ -193,24 +179,18 @@ namespace UnlockUserAD
                     UserPrincipal user = result as UserPrincipal;
                     if (user != null && user.IsAccountLockedOut())                                                                              // Print out all locked users
                     {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"\t- {user.SamAccountName}");
-                        Console.ForegroundColor = ConsoleColor.Gray;
+                        Console.WriteLine($"\t- {user.SamAccountName}".Pastel(Color.Crimson));
                         isAnyLocked = true;
                     }// end of if-statement
                 }// end of foreach
                 if (!isAnyLocked)
                 {
-                    Console.ForegroundColor = ConsoleColor.DarkCyan;
-                    Console.WriteLine($"\tNo accounts are LOCKED!!! YAY!!!.");
-                    Console.ForegroundColor = ConsoleColor.Gray;
+                    Console.WriteLine($"\tNo accounts are LOCKED!!! YAY!!!.".Pastel(Color.RoyalBlue));
                 }// end of if-statement
             }// end of try-catch
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Error: {ex.Message}");
-                Console.ForegroundColor = ConsoleColor.Gray;
+                Console.WriteLine($"Error: {ex.Message}".Pastel(Color.IndianRed));
             }// end of catch
         }// end of CheckLockedAccounts
     }// end of class

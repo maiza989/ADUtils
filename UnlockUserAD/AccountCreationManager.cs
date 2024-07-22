@@ -6,10 +6,12 @@ using System.Management.Automation.Runspaces;
 using System.Security;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using Pastel;
+using System.Drawing;
 
 
 // TODO - DONE User Account Creation: Enable users to create new accounts in Active Directory. 
-namespace UnlockUserAD
+namespace ADUtils
 {
     
     public class AccountCreationManager
@@ -143,7 +145,7 @@ namespace UnlockUserAD
             bool isExit = false;
             while (!isExit)
             {
-                Console.Write("Please verify all new user information are correct !!!(Y/N):");
+                Console.Write($"Please verify all new user information are correct !!!{"(Y/N)".Pastel(Color.MediumPurple)}:");
                 string confirmation = Console.ReadLine().ToUpper().Trim();
 
                 if (confirmation == "Y")
@@ -194,7 +196,7 @@ namespace UnlockUserAD
                         }// end of using
 
                         Console.ForegroundColor = ConsoleColor.DarkCyan;
-                        Console.WriteLine($"User Account '{username}' Created Successfully!!!");
+                        Console.WriteLine($"User Account '{username}' Created Successfully!!!".Pastel(Color.DarkOliveGreen));
                         Console.ForegroundColor = ConsoleColor.Gray;
 
                         user.Dispose();
@@ -298,7 +300,7 @@ namespace UnlockUserAD
                         }// end of foreach
 
                         Console.ForegroundColor = ConsoleColor.DarkCyan;
-                        Console.WriteLine($"User '{username}' added to roups: {string.Join(", ", groups)}!!!");
+                        Console.WriteLine($"User '{username}' added to roups: {string.Join(", ", groups)}!!!".Pastel(Color.DarkOliveGreen));
                         Console.ForegroundColor = ConsoleColor.Gray;
                     }// end of if-statement
                     else
@@ -325,9 +327,7 @@ namespace UnlockUserAD
                 try
                 {
                     Directory.CreateDirectory(directoryPath);
-                    Console.ForegroundColor = ConsoleColor.DarkCyan;
-                    Console.WriteLine($"CLS folder has been created in: {directoryPath}");
-                    Console.ForegroundColor = ConsoleColor.Gray;
+                    Console.WriteLine($"CLS folder has been created in: {directoryPath}".Pastel(Color.DarkOliveGreen));
                 }// end of try
                 catch (Exception ex)
                 {
@@ -336,9 +336,7 @@ namespace UnlockUserAD
             }// end of if-statement
             else
             {
-                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.WriteLine($"CLS file already Exist for this user: {username}");
-                Console.ForegroundColor = ConsoleColor.Gray;
+                Console.WriteLine($"CLS file already Exist for this user: {username}".Pastel(Color.DarkGoldenrod));
             }// end of else-statement
         }// end of CreateCLSFolder
 
@@ -378,7 +376,7 @@ namespace UnlockUserAD
                 foreach (ErrorRecord error in ps.Streams.Error)
                 {
                     Console.ForegroundColor = ConsoleColor.DarkRed;
-                    Console.WriteLine($"Error {action}: {error.Exception.Message}");
+                    Console.WriteLine($"Error {action}: {error.Exception.Message}".Pastel(Color.IndianRed));
                     Console.ForegroundColor = ConsoleColor.Gray;
                 }// end of foreach
                 return true;
@@ -446,7 +444,7 @@ namespace UnlockUserAD
                 if (HandlePowershellErrors(ps, $"enabling mailbox for '{username}'")) return;
 
                 Console.ForegroundColor = ConsoleColor.DarkCyan;
-                Console.WriteLine($"Mailbox for '{username}' created successfully!!");
+                Console.WriteLine($"Mailbox for '{username}' created successfully!!".Pastel(Color.DarkOliveGreen));
                 Console.ForegroundColor = ConsoleColor.Gray;
 
                 runspace.Close();

@@ -4,8 +4,11 @@ using System.Diagnostics;
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Security.Cryptography.X509Certificates;
-using UnlockUserAD;
+using ADUtils;
+using Pastel;
+using System.Drawing;
 // TODO - DONE - Audit Logging: Log fuction to record important action performed.
+// TODO - User Account Deactivation: Implement functionality to deactivate user accounts securely.
 
 class Program
 {
@@ -16,6 +19,7 @@ class Program
 
     static void GetAdminCreditials()
     {
+
         Console.Write("Enter admin username: ");
         adminUsername = Console.ReadLine().Trim();
         Console.Write("Enter admin password: ");
@@ -23,6 +27,8 @@ class Program
     }
     static void Main(string[] args)
     {
+       
+
         ActiveDirectoryManager ADManager = new ActiveDirectoryManager();
         AccountCreationManager ACManager;
         PasswordManager PWDManager = null;
@@ -39,11 +45,8 @@ class Program
                     if (context.ConnectedServer != null)                                                                                                                      // Throw error if the password/username is incorrect        
                     {
                         isAuthenticated = true;
-
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"Connected to Active Directory as: {adminUsername}.");
-                        Console.ForegroundColor = ConsoleColor.Gray;
-
+                        Console.WriteLine($"Connected to Active Directory as: {adminUsername}.".Pastel(Color.GreenYellow));
+               
                         auditLogManager = new AuditLogManager(adminUsername);
                         ADGroupManager = new ADGroupActionManager(auditLogManager);
                         PWDManager = new PasswordManager(auditLogManager);
@@ -62,18 +65,14 @@ class Program
                 }// end of using
             }// end of Try-Catch
             catch (DirectoryServicesCOMException)                                                                                                                              // Error out if password/username are incorrect
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Error: Unable to connect to the Active Directory server. Please check your credentials and try again.");
-                Console.ForegroundColor = ConsoleColor.Gray;
+            {         
+                Console.WriteLine("Error: Unable to connect to the Active Directory server. Please check your credentials and try again.".Pastel(Color.IndianRed));
             }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"An error occurred: {ex.Message}");
-                Console.ForegroundColor = ConsoleColor.Gray;
+                Console.WriteLine($"An error occurred: {ex.Message}".Pastel(Color.IndianRed));
             }// end of Catch
-        } while (!isAuthenticated && string.IsNullOrEmpty(adminUsername));                                                                                                                                            // Repeat until a valid password is entered
+        } while (!isAuthenticated || string.IsNullOrEmpty(adminUsername));                                                                                                                                            // Repeat until a valid password is entered
     }// end of Main Method
 
 
@@ -120,7 +119,7 @@ class Program
                 Console.Clear();
                 break;
             default:
-                Console.WriteLine("Invalid option. Please try again.");
+                Console.WriteLine("Invalid option. Please try again.".Pastel(Color.IndianRed));
                 break;
         }// end of switch case
         return false;
@@ -141,7 +140,7 @@ class Program
             Console.WriteLine("1. Unlock a Specific User");
             Console.WriteLine("2. Check All Locked Accounts");
             Console.WriteLine("3. Unlock All Locked Accounts");
-            Console.Write("Enter your choice(Type \"exit\" to return to main menu): ");
+            Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
             string choice = Console.ReadLine().ToLower().Trim();
             switch (choice)
             {
@@ -158,7 +157,7 @@ class Program
                     exit = true;
                     break;
                 default:
-                    Console.WriteLine("Invalid option. Please try again.");
+                    Console.WriteLine("Invalid option. Please try again.".Pastel(Color.IndianRed));
                     break;
             }// end of switch-case
         }// end of while
@@ -181,7 +180,7 @@ class Program
             Console.WriteLine("2. Add User to a Group");
             Console.WriteLine("3. Remove User From a Group");
             Console.WriteLine("4. Check Who is Member in a Group");
-            Console.Write("Enter your choice(Type \"exit\" to return to main menu): ");
+            Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
 
             string choice = Console.ReadLine().ToLower().Trim();
             switch (choice)
@@ -202,7 +201,7 @@ class Program
                     exit = true;
                     break;
                 default:
-                    Console.WriteLine("Invalid option. Please try again.");
+                    Console.WriteLine("Invalid option. Please try again.".Pastel(Color.IndianRed));
                     break;
             }// end of switch-case
         }// end of while loop
@@ -226,7 +225,7 @@ class Program
             Console.WriteLine("2. Display General User Info");
             Console.WriteLine("3. Reset A User Password");
             Console.WriteLine("4. Create New User Account");
-            Console.Write("Enter your choice(Type \"exit\" to return to main menu): ");
+            Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
 
             string choice = Console.ReadLine().ToLower().Trim();
             switch (choice)
@@ -247,7 +246,7 @@ class Program
                     exit = true;
                     break;
                 default:
-                    Console.WriteLine("Invalid option. Please try again.");
+                    Console.WriteLine("Invalid option. Please try again.".Pastel(Color.IndianRed));
                     break;
             }// end of switch-case
         }// end of while loop
@@ -258,4 +257,5 @@ class Program
     {
 
     }
+   
 }// end of class

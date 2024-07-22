@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.DirectoryServices.AccountManagement;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Net.Mail;
+﻿using System.DirectoryServices.AccountManagement;
+using Pastel;
+using System.Drawing;
 
-namespace UnlockUserAD
+namespace ADUtils
 { 
     public class ADGroupActionManager
     {       
@@ -26,11 +22,11 @@ namespace UnlockUserAD
         public void AddUserToGroup(PrincipalContext context)
         {
             bool isExit = false;
-            List<string> emailActionLog = new List<string>();                                                                                                               // Email log list
+            List<string> emailActionLog = new List<string>();                                                                                                          // Email log list
 
             do
             {
-                Console.Write("Enter the username(Type 'exit' to go back to menu): ");
+                Console.Write($"Enter the username(Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
                 string username = Console.ReadLine().Trim();
                 if (username.ToLower().Trim() == "exit")
                 {
@@ -38,7 +34,7 @@ namespace UnlockUserAD
                     Console.WriteLine($"\nReturing to menu...");
                     break;
                 }
-                Console.Write("Enter the group name (Type 'exit' to go back to menu): ");
+                Console.Write($"Enter the group name (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
                 string groupName = Console.ReadLine().Trim();
                 if (groupName.ToLower().Trim() == "exit")
                 {
@@ -64,9 +60,7 @@ namespace UnlockUserAD
                                     group.Members.Add(user);                                                                                                            // Add the user to the group
                                     group.Save();                                                                                                                       // Apply changes
                                     group.Dispose();
-                                    Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.WriteLine($"User '{username}' added to group '{groupName}' successfully.");
-                                    Console.ForegroundColor = ConsoleColor.Gray;
+                                    Console.WriteLine($"User '{username}' added to group '{groupName}' successfully.".Pastel(Color.LimeGreen));
 
                                     string logEntry = ($"\"{user.DisplayName}\" has been Added to \"{groupName}\" group in Active Directory\n");
                                     emailActionLog.Add(logEntry);
@@ -75,30 +69,22 @@ namespace UnlockUserAD
                                 }// end of inner-2 if-statement
                                 else
                                 {
-                                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                                    Console.WriteLine($"User '{username}' is already a member of group '{groupName}'.");
-                                    Console.ForegroundColor = ConsoleColor.Gray;
+                                    Console.WriteLine($"User '{username}' is already a member of group '{groupName}'.".Pastel(Color.DarkGoldenrod));
                                 }// end of inner-2 else-statement
                             }// end of inner if-statement
                             else
                             {
-                                Console.ForegroundColor = ConsoleColor.DarkRed;
-                                Console.WriteLine($"Group '{groupName}' not found in Active Directory.");
-                                Console.ForegroundColor = ConsoleColor.Gray;
+                                Console.WriteLine($"Group '{groupName}' not found in Active Directory.".Pastel(Color.IndianRed));
                             }// end of outter else-statement
                         }// end of outter if-statement 
                         else
                         {
-                            Console.ForegroundColor = ConsoleColor.DarkRed;
-                            Console.WriteLine($"User '{username}' not found in Active Directory.");
-                            Console.ForegroundColor = ConsoleColor.Gray;
+                            Console.WriteLine($"User '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
                         }
                     }// end of try
                     catch (Exception ex)
                     {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"Error adding user to group: {ex.Message}");
-                        Console.ForegroundColor = ConsoleColor.Gray;
+                        Console.WriteLine($"Error adding user to group: {ex.Message}".Pastel(Color.IndianRed));
                     }// end of catch
                 }
             } while (!isExit);
@@ -120,7 +106,7 @@ namespace UnlockUserAD
 
             do
             {
-                Console.Write("Enter the username(Type 'exit' to go back to menu): ");
+                Console.Write($"Enter the username(Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
                 string username = Console.ReadLine().Trim();
                 if (username.ToLower().Trim() == "exit")
                 {
@@ -128,7 +114,7 @@ namespace UnlockUserAD
                     Console.WriteLine($"\nReturing to menu...");
                     break;
                 }
-                Console.Write("Enter the group name (Type 'exit' to go back to menu): ");
+                Console.Write($"Enter the group name (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
                 string groupName = Console.ReadLine().Trim();
                 if (groupName.ToLower().Trim() == "exit")
                 {
@@ -155,9 +141,7 @@ namespace UnlockUserAD
                                     group.Members.Remove(user);                                                                                                        // Apply changes
                                     group.Save();
                                     group.Dispose();
-                                    Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.WriteLine($"User '{username}' removed from group '{groupName}' successfully.");
-                                    Console.ForegroundColor = ConsoleColor.Gray;
+                                    Console.WriteLine($"User '{username}' removed from group '{groupName}' successfully.".Pastel(Color.LimeGreen));
 
                                     string logEntry = ($"\"{user.DisplayName}\" has been removed from \"{groupName}\" group in Active Directory\n");
                                     emailActionLog.Add(logEntry);
@@ -166,25 +150,18 @@ namespace UnlockUserAD
                                 }// end of inner-2 if-statement
                                 else
                                 {
-                                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                                    Console.WriteLine($"User '{username}' is not a member of group '{groupName}'.");
-                                    Console.ForegroundColor = ConsoleColor.Gray;
+                                    Console.WriteLine($"User '{username}' is not a member of group '{groupName}'.".Pastel(Color.DarkGoldenrod));
                                 }// end of inner-2 else-statement
                             }// end of inner if-statement
                             else
                             {
-                                Console.ForegroundColor = ConsoleColor.DarkRed;
-                                Console.WriteLine($"Group '{groupName}' not found in Active Directory.");
-                                Console.ForegroundColor = ConsoleColor.Gray;
+                                Console.WriteLine($"Group '{groupName}' not found in Active Directory.".Pastel(Color.IndianRed));
                             }// end of outter else-statement
                         }// end of outter if-statement 
                         else
                         {
-                            Console.ForegroundColor = ConsoleColor.DarkRed;
-                            Console.WriteLine($"User '{username}' not found in Active Directory.");
-                            Console.ForegroundColor = ConsoleColor.Gray;
+                            Console.WriteLine($"User '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
                         }
-                        
                     }// end of try
                     catch (Exception ex)
                     {
@@ -212,7 +189,7 @@ namespace UnlockUserAD
 
             try
             {
-                Console.Write("Enter the first letter of the group name to filter (or press Enter to show all groups): ");
+                Console.Write($"Enter the {"first letter".Pastel(Color.MediumPurple)} of the group name to filter by (or press Enter to show all groups): ");
                 char filterLetter = Console.ReadKey().KeyChar;
                 Console.WriteLine();
 
@@ -250,9 +227,7 @@ namespace UnlockUserAD
             }// end of try
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Error listing groups: {ex.Message}");
-                Console.ForegroundColor = ConsoleColor.Gray;
+                Console.WriteLine($"Error listing groups: {ex.Message}".Pastel(Color.IndianRed));
             }// end of catch
         }// end of ListAllGroups
 
@@ -265,7 +240,7 @@ namespace UnlockUserAD
             bool isExit = false;
             do
             {
-                Console.Write("Enter the group name (Type 'exit' to go back to menu): ");
+                Console.Write($"Enter the group name (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
                 string groupName = Console.ReadLine().Trim();
                 if (groupName.ToLower() == "exit")
                 {
@@ -317,16 +292,12 @@ namespace UnlockUserAD
                         }// end of if-statements
                         else
                         {
-                            Console.ForegroundColor = ConsoleColor.DarkRed;
-                            Console.WriteLine($"Group '{groupName}' not found in Active Directory.");
-                            Console.ForegroundColor = ConsoleColor.Gray;
+                            Console.WriteLine($"Group '{groupName}' not found in Active Directory.".Pastel(Color.IndianRed));
                         }// end of else
                     }// end of try-catch
                     catch (Exception ex)
                     {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"Error listing members of group: {ex.Message}");
-                        Console.ForegroundColor = ConsoleColor.Gray;
+                        Console.WriteLine($"Error listing members of group: {ex.Message}".Pastel(Color.IndianRed));
                     }// end of catch
                 }// end of else
             } while (!isExit);

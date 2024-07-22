@@ -1,13 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using Pastel;
+using System.Drawing;
 using System.Net.Mail;
-using System.Text;
-using System.Threading.Tasks;
+
 
 
 // TODO - DONE Add who made the changes to the email notifications.
-namespace UnlockUserAD
+namespace ADUtils
 {
     public class EmailNotifcationManager
     {
@@ -33,11 +31,11 @@ namespace UnlockUserAD
                 smtpServer.EnableSsl = false;                                                                                               // Enable SSL if required by your SMTP provider
 
                 smtpServer.Send(mail);
-                Console.WriteLine($"\nNotification email sent successfully.");
+                Console.WriteLine($"\nNotification email sent successfully.".Pastel(Color.SpringGreen));
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"\nFailed to send email: {ex.Message}");
+                Console.WriteLine($"\nFailed to send email: {ex.Message}".Pastel(Color.Crimson));
             }// end of catch
         }// end of SendEmailNotification
     }// end of class

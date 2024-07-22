@@ -4,12 +4,12 @@ using System.Diagnostics;
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Text.RegularExpressions;
-using UnlockUserAD;
+using ADUtils;
 
 
 // TODO - DONE Add feature to Reset user password.
 
-namespace UnlockUserAD
+namespace ADUtils
 {
     public class PasswordManager
     {
