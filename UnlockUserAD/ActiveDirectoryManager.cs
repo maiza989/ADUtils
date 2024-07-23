@@ -103,9 +103,7 @@ namespace ADUtils
                             if (user.IsAccountLockedOut())                                                                                           // Check if the user is locked
                             {
                                 user.UnlockAccount();                                                                                                // Unlock user
-                                Console.ForegroundColor = ConsoleColor.Green;
-                                Console.WriteLine($"\tUser account '{username}' has been unlocked.");
-                                Console.ForegroundColor = ConsoleColor.Gray;
+                                Console.WriteLine($"\tUser account '{username}' has been unlocked.".Pastel(Color.LimeGreen));
                             }// end of inner-if-statement
                             else
                             {                               

@@ -1,24 +1,84 @@
 ﻿using Pastel;
 using System;
+using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
+using System.DirectoryServices.ActiveDirectory;
 using System.Drawing;
+using static Microsoft.ApplicationInsights.MetricDimensionNames.TelemetryContext;
 
 namespace ADUtils
 {
     public class AccountDeactivationManager
     {
-        public void DeactivateUserAccount(PrincipalContext context)
+        string myDomain = Environment.GetEnvironmentVariable("MY_DOMAIN");                                              // Update with your domain
+        string mydomainDotCom = Environment.GetEnvironmentVariable("MY_DOMAIN.COM");                                    // Update with your second part of your domain (domain(.com))
+
+        public void DeactivateUserAccount(PrincipalContext context, string adminUsername, string adminPassword)
         {
+            string ouPath = $"LDAP://OU=Ex Employee,OU=Lloydmc_Lou,DC={myDomain},DC={mydomainDotCom}";
+            DateTime deletionDate = DateTime.Now.AddDays(31);                                                           // Calculate Today's date + 31 days
+            string deletionDateString = deletionDate.ToString("MM-dd-yyyy");                                            // Format the date
             bool returnToMenu = false;
+
             do
             {
-                Console.Write($"Enter the username to unlock (type {"'exit'".Pastel(Color.MediumPurple)} to return to the main menu): ");
+                Console.Write($"Enter the username to deactivate (type {"'exit'".Pastel(Color.MediumPurple)} to return to the main menu): ");
                 string username = Console.ReadLine().Trim().ToLower();
 
                 if (username.ToLower().Trim() == "exit")
                 {
                     returnToMenu = true;
                 }// end of if statement
+                else
+                {
+                    try
+                    {
+                        UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);              // Search for specific user using username
+                        if(user != null)
+                        {
+                            var groups = user.GetGroups();                                                                              // Get all group user is member of
+                            foreach (var group in groups )
+                            {
+                                if(group.Name != "Domain Users" && group is GroupPrincipal)                                             // Remove all group except 'Domain User'
+                                {
+                                    GroupPrincipal groupPrincipal = (GroupPrincipal)group;
+                                    groupPrincipal.Members.Remove(user);
+                                    groupPrincipal.Save();
+                                }// end of if statement
+                            }// end of foreach
+                            Console.WriteLine($"User account '{username}' has been removed from all groups except 'Domain Users'".Pastel(Color.LimeGreen));
+                            if (user.Enabled == true)
+                            {
+                                user.Enabled = false;                                                                                   // Disabling the user account
+                                user.Description = $"Delete on {deletionDateString}";                                                   // Change discription with reminder of when to delete the ex user account
+                                user.Save();
+                                Console.WriteLine($"User account '{username}' has been disabled\nAccount description change to 'Delete on {deletionDateString}!".Pastel(Color.LimeGreen));
+
+                                using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())                           // Move user to the specified OU
+                                {
+                                    DirectoryEntry startOU = new DirectoryEntry(userEntry.Path);
+                                    DirectoryEntry endOU = new DirectoryEntry(ouPath, adminUsername, adminPassword);
+                                    
+                                    userEntry.CommitChanges();
+                                    startOU.MoveTo(endOU);
+                                    Console.WriteLine($"User account '{username}' has been moved to Ex Employee OU".Pastel(Color.LimeGreen));
+                                }// end of using
+                            }// end of if statetment
+                            else
+                            {
+                                Console.WriteLine($"User account '{username}' is {"ALREADY".Pastel(Color.MediumPurple)} disabled".Pastel(Color.DarkGoldenrod));
+                            }// end of else statement
+                        }// end of if statement
+                        else
+                        {
+                            Console.WriteLine($"\tUser account '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
+                        }// end of else statement
+                    }// end of try
+                    catch
+                    {
+
+                    }// end of catch
+                }// end of else statement
             } while(!returnToMenu);   
         }// end of DeactivateUserAccount
     }// end of class

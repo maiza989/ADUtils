@@ -27,14 +27,12 @@ class Program
     }
     static void Main(string[] args)
     {
-       
-
         ActiveDirectoryManager ADManager = new ActiveDirectoryManager();
         AccountCreationManager ACManager;
+        AccountDeactivationManager ACCDeactivationManager = new AccountDeactivationManager();
         PasswordManager PWDManager = null;
         ADGroupActionManager ADGroupManager = null;
         AuditLogManager auditLogManager = null;
-        
         do
         {
         GetAdminCreditials();
@@ -52,13 +50,12 @@ class Program
                         PWDManager = new PasswordManager(auditLogManager);
                         ACManager = new AccountCreationManager(auditLogManager);
 
-
                         bool exit = false;
                         while (!exit)                                                                                                                                          // Loop the menu
                         {
                             DisplayMainMenu();
                             string choice = Console.ReadLine();
-                            exit = HandleMainMenuChoice(choice, context, ADManager, ADGroupManager, PWDManager, ACManager);
+                            exit = HandleMainMenuChoice(choice, context, ADManager, ADGroupManager, PWDManager, ACManager, ACCDeactivationManager);
                         }// end of while-loop
                     }// end of if statement
                     context.Dispose();
@@ -100,7 +97,7 @@ class Program
     /// <param name="ADGroupManager">A class that manage user groups </param>
     /// <param name="PWDManager"> A class that manager user password related events</param>
     /// <returns></returns>
-    static bool HandleMainMenuChoice(string choice, PrincipalContext context, ActiveDirectoryManager ADManager, ADGroupActionManager ADGroupManager, PasswordManager PWDManager, AccountCreationManager ACManager)
+    static bool HandleMainMenuChoice(string choice, PrincipalContext context, ActiveDirectoryManager ADManager, ADGroupActionManager ADGroupManager, PasswordManager PWDManager, AccountCreationManager ACManager, AccountDeactivationManager ACCDeactivationManager)
     {
         switch (choice)
         {
@@ -111,7 +108,7 @@ class Program
                 DisplayGroupManagementMenu(context, ADGroupManager);
                 break;
             case "3":
-                DisplayUserInfoMenu(context, ADManager, PWDManager, ACManager);
+                DisplayUserInfoMenu(context, ADManager, PWDManager, ACManager, ACCDeactivationManager);
                 break;
             case "4":
                 return true;
@@ -214,7 +211,7 @@ class Program
     /// <param name="context"></param>
     /// <param name="ADManager"></param>
     /// <param name="PWDManager"></param>
-    static void DisplayUserInfoMenu(PrincipalContext context, ActiveDirectoryManager ADManager, PasswordManager PWDManager, AccountCreationManager ACManager)
+    static void DisplayUserInfoMenu(PrincipalContext context, ActiveDirectoryManager ADManager, PasswordManager PWDManager, AccountCreationManager ACManager, AccountDeactivationManager ACCDeactivationManager)
     {
         bool exit = false;
         while (!exit)
@@ -225,6 +222,7 @@ class Program
             Console.WriteLine("2. Display General User Info");
             Console.WriteLine("3. Reset A User Password");
             Console.WriteLine("4. Create New User Account");
+            Console.WriteLine("5. Disable User Account");
             Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
 
             string choice = Console.ReadLine().ToLower().Trim();
@@ -241,6 +239,9 @@ class Program
                     break;
                 case "4":
                     ACManager.CreateUserAccount(adminUsername, adminPassword);
+                    break;
+                case "5":
+                   ACCDeactivationManager.DeactivateUserAccount(context, adminUsername, adminPassword);
                     break;
                 case "exit":
                     exit = true;
