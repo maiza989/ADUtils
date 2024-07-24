@@ -8,8 +8,20 @@ using ADUtils;
 using Pastel;
 using System.Drawing;
 // TODO - DONE - Audit Logging: Log fuction to record important action performed.
-// TODO - User Account Deactivation: Implement functionality to deactivate user accounts securely.
+// TODO - DONE User Account Deactivation: Implement functionality to deactivate user accounts securely.
+// TODO - Create/Delete Groups: Allow creating and deleting security groups or distribution lists.
 
+
+/// <summary>
+/// Edit the following:
+/// 
+///  - BaseLogDirectory with your desire Log location in AuditLogManager Class.
+/// 
+///  - myDomain, myDomainDotCom, myParentOU, myCompany, myExchangeDatabase, myExchangeServer, and outPath with your own values for successful execution in AccountCreationManager Class.
+/// 
+///  - mySTMPServer, myFromEmail, myPassword, myToEmail with your own values for successful execution in EmailNotificationManager Class. 
+///  
+/// </summary>
 class Program
 {
     static bool isLocked = false;

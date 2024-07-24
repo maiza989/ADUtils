@@ -25,14 +25,14 @@ namespace ADUtils
         }
         public AccountCreationManager(){}
 
-        string myDomain = Environment.GetEnvironmentVariable("MY_DOMAIN");                                              // Update with your domain
-        string mydomainDotCom = Environment.GetEnvironmentVariable("MY_DOMAIN.COM");                                    // Update with your second part of your domain (domain(.com))
-        string myParentOU = Environment.GetEnvironmentVariable("MY_PARENT_OU");                                         // Update with your path of Users OU
-        string myCompany = Environment.GetEnvironmentVariable("MY_COMPANY");                                            // Update with your company email domain (*@companyName.com)
-        string myExhcangeDatabase = Environment.GetEnvironmentVariable("MY_EXCHANGE_DATABASE");                         // Update with your Exchange server database
-        string myExchangeServer = Environment.GetEnvironmentVariable("MY_EXCHANGE_SERVER");                             // Update with your exchange server name.
+        public string myDomain = Environment.GetEnvironmentVariable("MY_DOMAIN");                                               // Update with your domain
+        public string mydomainDotCom = Environment.GetEnvironmentVariable("MY_DOMAIN.COM");                                     // Update with your second part of your domain (domain(.com))
+        private string myParentOU = Environment.GetEnvironmentVariable("MY_PARENT_OU");                                         // Update with your path of Users OU
+        private string myCompany = Environment.GetEnvironmentVariable("MY_COMPANY");                                            // Update with your company email domain (*@companyName.com)
+        private string myExhcangeDatabase = Environment.GetEnvironmentVariable("MY_EXCHANGE_DATABASE");                         // Update with your Exchange server database
+        private string myExchangeServer = Environment.GetEnvironmentVariable("MY_EXCHANGE_SERVER");                             // Update with your exchange server name.
 
-        int processSleepTimer = 1000;
+        public int processSleepTimer = 1000;
 
         string firstName;
         string lastName;

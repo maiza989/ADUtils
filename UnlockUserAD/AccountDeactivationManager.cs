@@ -10,12 +10,10 @@ namespace ADUtils
 {
     public class AccountDeactivationManager
     {
-        string myDomain = Environment.GetEnvironmentVariable("MY_DOMAIN");                                              // Update with your domain
-        string mydomainDotCom = Environment.GetEnvironmentVariable("MY_DOMAIN.COM");                                    // Update with your second part of your domain (domain(.com))
-
+        AccountCreationManager ACManager;
         public void DeactivateUserAccount(PrincipalContext context, string adminUsername, string adminPassword)
         {
-            string ouPath = $"LDAP://OU=Ex Employee,OU=Lloydmc_Lou,DC={myDomain},DC={mydomainDotCom}";
+            string ouPath = $"LDAP://OU=Ex Employee,OU=Lloydmc_Lou,DC={ACManager.myDomain},DC={ACManager.myDomain}";
             DateTime deletionDate = DateTime.Now.AddDays(31);                                                           // Calculate Today's date + 31 days
             string deletionDateString = deletionDate.ToString("MM-dd-yyyy");                                            // Format the date
             bool returnToMenu = false;
@@ -52,7 +50,7 @@ namespace ADUtils
                                 user.Enabled = false;                                                                                   // Disabling the user account
                                 user.Description = $"Delete on {deletionDateString}";                                                   // Change discription with reminder of when to delete the ex user account
                                 user.Save();
-                                Console.WriteLine($"User account '{username}' has been disabled\nAccount description change to 'Delete on {deletionDateString}!".Pastel(Color.LimeGreen));
+                                Console.WriteLine($"User account '{username}' has been disabled\nAccount description changed to 'Delete on {deletionDateString}!".Pastel(Color.LimeGreen));
 
                                 using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())                           // Move user to the specified OU
                                 {
