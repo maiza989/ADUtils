@@ -26,7 +26,7 @@ class Program
 {
     static bool isLocked = false;
     static int countdownSeconds = 60;
-    static string adminUsername, adminPassword;
+    private static string adminUsername, adminPassword;
     static private bool isAuthenticated = false;
 
     static void GetAdminCreditials()

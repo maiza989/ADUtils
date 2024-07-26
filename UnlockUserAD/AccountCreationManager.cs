@@ -8,6 +8,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Pastel;
 using System.Drawing;
+using static Microsoft.ApplicationInsights.MetricDimensionNames.TelemetryContext;
 
 
 // TODO - DONE User Account Creation: Enable users to create new accounts in Active Directory. 
@@ -28,29 +29,29 @@ namespace ADUtils
         public string myDomain = Environment.GetEnvironmentVariable("MY_DOMAIN");                                               // Update with your domain
         public string mydomainDotCom = Environment.GetEnvironmentVariable("MY_DOMAIN.COM");                                     // Update with your second part of your domain (domain(.com))
         private string myParentOU = Environment.GetEnvironmentVariable("MY_PARENT_OU");                                         // Update with your path of Users OU
-        private string myCompany = Environment.GetEnvironmentVariable("MY_COMPANY");                                            // Update with your company email domain (*@companyName.com)
+        public string myCompany = Environment.GetEnvironmentVariable("MY_COMPANY");                                             // Update with your company email domain (*@companyName.com)
         private string myExhcangeDatabase = Environment.GetEnvironmentVariable("MY_EXCHANGE_DATABASE");                         // Update with your Exchange server database
         private string myExchangeServer = Environment.GetEnvironmentVariable("MY_EXCHANGE_SERVER");                             // Update with your exchange server name.
 
         public int processSleepTimer = 1000;
 
-        string firstName;
-        string lastName;
-        string jobTitle;
-        string departmentEntry;
-        string description;
-        string office;
-        string manager;
-        string targetOU;
-        string firstInitial;
-        string lastInitial;
-        string username;
-        string email;
-        string password;
-        string userProfile;
-        string clsUserFolder;
+        private string firstName;
+        private string lastName;
+        private string jobTitle;
+        private string departmentEntry;
+        private string description;
+        private string office;
+        private string manager;
+        private string targetOU;
+        private string firstInitial;
+        private string lastInitial;
+        private string username;
+        private string email;
+        private string password;
+        private string userProfile;
+        private string clsUserFolder;
 
-        List<string> emailActionLog = new List<string>();                                                                // String list that hold email body
+        private List<string> emailActionLog = new List<string>();                                                                // String list that hold email body
 
         /// <summary>
         /// Create a user in Active Directory based on the information provided by the user.
@@ -76,14 +77,48 @@ namespace ADUtils
             description = Console.ReadLine();
 
             Console.Write("Enter user office (KY, MI, GA, or Remote): ");
-            office = Console.ReadLine();
+            office = Console.ReadLine().Trim();
 
             /*Console.Write("Enter user manager (SAM Account Name): ");
             manager = Console.ReadLine();*/
-
-            Console.WriteLine("Select New User OU. Enter Number or Full Name (1- IT, 2- Collector, 3- Admin Staff, 4- Atty, 5- Acct, 6- Compliance, 7- Michigan_Users, 8- Cooling_Users)");
-            Console.Write("Enter your choice:");
-            targetOU = Console.ReadLine().Trim();
+            switch (office.Trim().ToUpper())
+            {
+                case "KY":
+                    Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)} or {"Full Name".Pastel(Color.MediumPurple)} " +
+                                      $"\n 1- IT\n, 2- Collector\n, 3- Admin Staff\n, 4- Atty\n, 5- Acct\n, 6- Compliance");
+                    Console.Write("Enter your choice:");
+                    targetOU = Console.ReadLine().Trim();
+                    break;
+                case "MI":
+                    Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)} or {"Full Name".Pastel(Color.MediumPurple)} " +
+                                      $"\n 7- Michigan_Users");
+                    Console.Write("Enter your choice:");
+                    targetOU = Console.ReadLine().Trim();
+                    break;
+                case "GA":
+                    Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)} or {"Full Name".Pastel(Color.MediumPurple)} " +
+                                      $"\n 8- Cooling_Users");
+                    Console.Write("Enter your choice:");
+                    targetOU = Console.ReadLine().Trim();
+                    break;
+                case "REMOTE":
+                    Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)} or {"Full Name".Pastel(Color.MediumPurple)} " +
+                                      $"\n( 1- IT\n, 2- Collector\n, 3- Admin Staff\n, 4- Atty\n, 5- Acct\n, 6- Compliance\n, " +
+                                      $"7- Michigan_Users\n, " +
+                                      $"8- Cooling_Users)\n");
+                    Console.Write("Enter your choice:");
+                    targetOU = Console.ReadLine().Trim();
+                    break;
+                default:
+                    Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)} or {"Full Name".Pastel(Color.MediumPurple)} " +
+                                      $"\n( 1- IT\n, 2- Collector\n, 3- Admin Staff\n, 4- Atty\n, 5- Acct\n, 6- Compliance\n, " +
+                                      $"7- Michigan_Users\n, " +
+                                      $"8- Cooling_Users)\n");
+                    Console.Write("Enter your choice:");
+                    targetOU = Console.ReadLine().Trim();
+                    break;
+            }// end of switch
+           
             switch (targetOU)
             {
                 case "1":
@@ -145,7 +180,7 @@ namespace ADUtils
             bool isExit = false;
             while (!isExit)
             {
-                Console.Write($"Please verify all new user information are correct !!!{"(Y/N)".Pastel(Color.MediumPurple)}:");
+                Console.Write($"\nPlease verify all new user information are correct !!!{"(Y/N)".Pastel(Color.MediumPurple)}:");
                 string confirmation = Console.ReadLine().ToUpper().Trim();
 
                 if (confirmation == "Y")
@@ -201,6 +236,7 @@ namespace ADUtils
 
                         user.Dispose();
 
+
                     }// end of UserPrincipal using
                 }// end of PrincipalContect using
 
@@ -209,13 +245,19 @@ namespace ADUtils
                 CreateExchangeMailbox(adminUsername, adminPassword);                                                                            // Create local Exchange mailbox
                 CreateCLSFolder(clsUserFolder);                                                                                                 // Optional: Create CLS folder for new user
                 LaunchBRPMgr();                                                                                                                 // Optional: Open BRP manager to create BRP account manually.
-
+                LaunchVLMMgr();                                                                                                                 // Optional: Open VLM to add CLS license to the user
+                LaunchHostMyCallsSite();                                                                                                        // Optional: Open Host
+                
                 string logEntry = ($"New Account has been created \"{firstName} {lastName} | {username}\" in Active Directory\n " +
+                                   $"\nUser added to {targetOU} OU and assgined basic groups \n" +
                                    $"\nNew Exchange MailBox has been created for \"{firstName} {lastName} | {username}\"\n" +
                                    $"\nNew CLS folder has been created for \"{firstName} {lastName} | {username}\"\n " +
-                                   $"\nNew BRP account has been ceated for \"{firstName} {lastName} | {username}\"\n ");
-                emailActionLog.Add(logEntry);
+                                   $"\nNew CLS license needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
+                                   $"\nNew BRP account needs to be created manually for \"{firstName} {lastName} | {username}\"\n" +
+                                   $"\nNew EXT needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
+                                   $"");
                 auditLogManager.Log(logEntry);
+                emailActionLog.Add(logEntry);
             }// end of try
             catch (Exception ex)
             {
@@ -258,6 +300,24 @@ namespace ADUtils
         }// end of IsUserCreated
 
         /// <summary>
+        /// Returns a string with a groups user is member of. 
+        /// </summary>
+        /// <param name="user"></param>
+        /// <returns></returns>
+        public string GetUserGroupsString(UserPrincipal user)
+        {
+            var userGroups = new List<string>();
+            var groups = user.GetGroups();
+
+            foreach (var group in groups)
+            {
+                userGroups.Add(group.Name);
+            }
+
+            string userGroupsString = string.Join(", ", userGroups);
+            return userGroupsString;
+        }// end of GetUserGroupsString
+        /// <summary>
         /// Add the user to the appropriate groups based on the target OU.
         /// </summary>
         /// <param name="username">The username of the new user.</param>
@@ -273,6 +333,7 @@ namespace ADUtils
             string[] acctGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Accounting", "LM_Accounting", "NoAccountingEmail" };
             string[] complianceGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Compliance" };
             string[] michiganUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "MI_All_Users_Printers" };
+            string[] gorgiaUsersGroups = {"_COLLECT", "_Training", "CW_AllUsers"};
 
             if (targetOu.Contains("IT") || targetOU.Contains("1")) groups = itGroups;
             else if (targetOu.Contains("Collector") || targetOU.Contains("2")) groups = collectorGroups;
@@ -281,6 +342,7 @@ namespace ADUtils
             else if (targetOu.Contains("Acct") || targetOU.Contains("5")) groups = acctGroups;
             else if (targetOu.Contains("Compliance") || targetOU.Contains("6")) groups = complianceGroups;
             else if (targetOu.Contains("Michigan_Users") || targetOU.Contains("7")) groups = michiganUsersGroups;
+            else if (targetOu.Contains("Cooling_Users") || targetOu.Contains("8")) groups = gorgiaUsersGroups;
 
             if (groups != null)
             {
@@ -343,10 +405,7 @@ namespace ADUtils
         /// <summary>
         /// Open BRP manager to create a BRP account for the new user manually.
         /// </summary>
-       
-
         // TODO - DONE create mailbox
-
         /// <summary>
         /// A method that convert a string to a secure string.
         /// </summary>
@@ -467,7 +526,41 @@ namespace ADUtils
                 Console.WriteLine($"An error occurred while trying to start the process: {ex.Message}");
             }// end of catch
         }// end of LaunchBRPMgr
+        private void LaunchVLMMgr()
+        {
+            Console.WriteLine($"Please add a CLS license to the new user MANUALLY!!!\nOpening VLM...");
+            Thread.Sleep(processSleepTimer);
 
+            ProcessStartInfo startInfo = new ProcessStartInfo();                                                                                    // Create a new process start info
+            startInfo.FileName = @"F:\Vertican\VLM\licensemanager.exe";                                                                             // Set the file name to the path of the executable
+
+            try
+            {
+                Process process = Process.Start(startInfo);                                                                                         // Start the process
+            }// end of try
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while trying to start the process: {ex.Message}");
+            }// end of catch
+        }// end of LaunchVLMMgr
+
+        private void LaunchHostMyCallsSite()
+        {
+            Console.WriteLine($"Please Add a extension to the new user MANUALLY!!!\nOpening HostMyCalls Site...");
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "http://lm.hostmycalls.com",
+                    UseShellExecute = true // This is necessary to open the URL in the default browser
+                };
+                Process.Start(psi);
+            }// end of try
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+            }// end of catch
+        }// end of LaunchHostMyCallsSite
         static void AnimateLine(string line)
         {
             foreach (char c in line)
