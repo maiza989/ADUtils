@@ -9,6 +9,7 @@ using System.Diagnostics;
 using Pastel;
 using System.Drawing;
 using static Microsoft.ApplicationInsights.MetricDimensionNames.TelemetryContext;
+using System.Configuration;
 
 
 // TODO - DONE User Account Creation: Enable users to create new accounts in Active Directory. 
@@ -19,12 +20,12 @@ namespace ADUtils
     {
         EmailNotifcationManager emailNotifcation = new EmailNotifcationManager();
         AuditLogManager auditLogManager;
-
+     
         public AccountCreationManager(AuditLogManager auditLogManager)
         {
             this.auditLogManager = auditLogManager;
         }
-        public AccountCreationManager(){}
+        public AccountCreationManager() { }
 
         public string myDomain = Environment.GetEnvironmentVariable("MY_DOMAIN");                                               // Update with your domain
         public string mydomainDotCom = Environment.GetEnvironmentVariable("MY_DOMAIN.COM");                                     // Update with your second part of your domain (domain(.com))
@@ -32,7 +33,7 @@ namespace ADUtils
         public string myCompany = Environment.GetEnvironmentVariable("MY_COMPANY");                                             // Update with your company email domain (*@companyName.com)
         private string myExhcangeDatabase = Environment.GetEnvironmentVariable("MY_EXCHANGE_DATABASE");                         // Update with your Exchange server database
         private string myExchangeServer = Environment.GetEnvironmentVariable("MY_EXCHANGE_SERVER");                             // Update with your exchange server name.
-
+        
         public int processSleepTimer = 1000;
 
         private string firstName;
