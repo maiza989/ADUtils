@@ -8,17 +8,16 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Pastel;
 using System.Drawing;
-using static Microsoft.ApplicationInsights.MetricDimensionNames.TelemetryContext;
-using System.Configuration;
 
 
 // TODO - DONE User Account Creation: Enable users to create new accounts in Active Directory. 
+// TODO - Fix moving users to correct OU for MI and GA users. Need a switch case to select the correct OU parent. 
 namespace ADUtils
 {
     
     public class AccountCreationManager
     {
-        EmailNotifcationManager emailNotifcation = new EmailNotifcationManager();
+        EmailNotifcationManager emailNotifcation = new EmailNotifcationManager(Program.configuration);
         AuditLogManager auditLogManager;
      
         public AccountCreationManager(AuditLogManager auditLogManager)
@@ -61,6 +60,7 @@ namespace ADUtils
         /// <param name="adminPassword"></param>
         public void CreateUserAccount(string adminUsername, string adminPassword)
         {
+            bool manualSteps = false;
             // Prompt for user details
             Console.Write("Enter new user's first name: ");
             firstName = Console.ReadLine();
@@ -247,8 +247,9 @@ namespace ADUtils
                 CreateCLSFolder(clsUserFolder);                                                                                                 // Optional: Create CLS folder for new user
                 LaunchBRPMgr();                                                                                                                 // Optional: Open BRP manager to create BRP account manually.
                 LaunchVLMMgr();                                                                                                                 // Optional: Open VLM to add CLS license to the user
-                LaunchHostMyCallsSite();                                                                                                        // Optional: Open Host
-                
+                LaunchHostMyCallsSite();                                                                                                        // Optional: Open Hostmycalls site to add EXT
+                LaunchO365Site();                                                                                                               // Optional: Open O365 site to add licesnes to the user.
+
                 string logEntry = ($"New Account has been created \"{firstName} {lastName} | {username}\" in Active Directory\n " +
                                    $"\nUser added to {targetOU} OU and assgined basic groups \n" +
                                    $"\nNew Exchange MailBox has been created for \"{firstName} {lastName} | {username}\"\n" +
@@ -256,6 +257,7 @@ namespace ADUtils
                                    $"\nNew CLS license needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
                                    $"\nNew BRP account needs to be created manually for \"{firstName} {lastName} | {username}\"\n" +
                                    $"\nNew EXT needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
+                                   $"\nNew O365 license needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
                                    $"");
                 auditLogManager.Log(logEntry);
                 emailActionLog.Add(logEntry);
@@ -270,6 +272,17 @@ namespace ADUtils
                 string emailBody = string.Join("\n", emailActionLog);
                 emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
             }// end of if statement
+            do
+            {
+                Console.WriteLine($"Have you completed the manual steps for CLS, BRP, Phone, Office 365?{"(Y/N)".Pastel(Color.MediumPurple)}\nEnter your choice:");
+                string result =  Console.ReadLine().Trim().ToUpper();
+                if(result == "Y")
+                {
+                    Console.WriteLine("Manual Steps complete");
+                    manualSteps = true;
+                }
+            } while(!manualSteps);
+
         }// end of CreateUserAccount
 
         /// <summary>
@@ -562,6 +575,23 @@ namespace ADUtils
                 Console.WriteLine($"An error occurred: {ex.Message}");
             }// end of catch
         }// end of LaunchHostMyCallsSite
+        private void LaunchO365Site()
+        {
+            Console.WriteLine($"Please Add a O365 licnese to the new user MANUALLY!!!\nOpening Microsoft Office Site...");
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "https://www.office.com",
+                    UseShellExecute = true // This is necessary to open the URL in the default browser
+                };
+                Process.Start(psi);
+            }// end of try
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+            }// end of catch
+        }// end of LaunchO365Site
         static void AnimateLine(string line)
         {
             foreach (char c in line)

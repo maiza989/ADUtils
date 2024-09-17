@@ -1,12 +1,9 @@
-﻿
-using System.Data;
-using System.Diagnostics;
-using System.DirectoryServices;
+﻿using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
-using System.Security.Cryptography.X509Certificates;
 using ADUtils;
 using Pastel;
 using System.Drawing;
+using Microsoft.Extensions.Configuration;
 // TODO - DONE - Audit Logging: Log fuction to record important action performed.
 // TODO - DONE User Account Deactivation: Implement functionality to deactivate user accounts securely.
 // TODO - Create/Delete Groups: Allow creating and deleting security groups or distribution lists.
@@ -26,8 +23,10 @@ class Program
 {
     static bool isLocked = false;
     static int countdownSeconds = 60;
-    private static string adminUsername, adminPassword;
+    public static string adminUsername;
+    private static string adminPassword;
     static private bool isAuthenticated = false;
+    public static IConfiguration configuration;
 
     static void GetAdminCreditials()
     {
@@ -45,6 +44,14 @@ class Program
         PasswordManager PWDManager = null;
         ADGroupActionManager ADGroupManager = null;
         AuditLogManager auditLogManager = null;
+
+        configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("Appsettings.json", optional: false, reloadOnChange: true)
+            .Build();
+        EmailNotifcationManager emailManager = new EmailNotifcationManager(configuration);
+       
+
         do
         {
         GetAdminCreditials();

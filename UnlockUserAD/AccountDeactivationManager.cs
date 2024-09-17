@@ -1,18 +1,18 @@
 ﻿using Pastel;
-using System;
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
-using System.DirectoryServices.ActiveDirectory;
 using System.Drawing;
-using static Microsoft.ApplicationInsights.MetricDimensionNames.TelemetryContext;
+
 
 namespace ADUtils
 {
     public class AccountDeactivationManager
     {
         AccountCreationManager ACManager;
+        
         public void DeactivateUserAccount(PrincipalContext context, string adminUsername, string adminPassword)
         {
+            
             string ouPath = $"LDAP://OU=Ex Employee,OU={ACManager.myCompany}_Lou,DC={ACManager.myDomain},DC={ACManager.myDomain}";
             DateTime deletionDate = DateTime.Now.AddDays(31);                                                           // Calculate Today's date + 31 days
             string deletionDateString = deletionDate.ToString("MM-dd-yyyy");                                            // Format the date

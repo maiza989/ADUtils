@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Appsettings.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <COMReference Include="ActiveDs">
       <WrapperTool>tlbimp</WrapperTool>
       <VersionMinor>0</VersionMinor>
@@ -21,7 +25,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="Appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Exchange.WebServices" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
     <PackageReference Include="Microsoft.PowerShell.Commands.Diagnostics" Version="7.4.3" />
     <PackageReference Include="Microsoft.PowerShell.Commands.Management" Version="7.4.3" />
     <PackageReference Include="Microsoft.PowerShell.Commands.Utility" Version="7.4.3" />

@@ -6,8 +6,10 @@ namespace ADUtils
 {
     public class AuditLogManager
     {
+        private readonly string _BaseLogDirectory;
         private static readonly string BaseLogDirectory = @"H:\IT\Maitham's Cave\ADUtil\Logs";                                   // Replace with your desire log location 
         private string logFilePath;
+
 
         /// <summary>
         /// A constructor that create and ensure the for log file exists.
