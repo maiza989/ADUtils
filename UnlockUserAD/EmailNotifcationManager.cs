@@ -23,6 +23,7 @@ namespace ADUtils
      
         public EmailNotifcationManager(IConfiguration configuration)
         {
+
             _mySTMPServer = configuration["EmailSettings:mySTMPServer"];
             _myFromEmail = configuration["EmailSettings:myFromEmail"];
             _myToEmail = configuration["EmailSettings:myToEmail"];

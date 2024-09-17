@@ -6,6 +6,7 @@ namespace ADUtils
 { 
     public class ADGroupActionManager
     {       
+
         EmailNotifcationManager emailNotifcation = new EmailNotifcationManager(Program.configuration);
         AuditLogManager auditLogManager;
 

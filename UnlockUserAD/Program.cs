@@ -21,6 +21,7 @@ using Microsoft.Extensions.Configuration;
 /// </summary>
 class Program
 {
+
     static bool isLocked = false;
     static int countdownSeconds = 60;
     public static string adminUsername;

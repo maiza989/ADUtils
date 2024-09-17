@@ -17,6 +17,7 @@ namespace ADUtils
     
     public class AccountCreationManager
     {
+
         EmailNotifcationManager emailNotifcation = new EmailNotifcationManager(Program.configuration);
         AuditLogManager auditLogManager;
      
