@@ -13,7 +13,7 @@ namespace ADUtils
         public void DeactivateUserAccount(PrincipalContext context, string adminUsername, string adminPassword)
         {
             
-            string ouPath = $"LDAP://OU=Ex Employee,OU={ACManager.myCompany}_Lou,DC={ACManager.myDomain},DC={ACManager.myDomain}";
+            string ouPath = $"LDAP://OU=Ex Employee,OU={ACManager._myCompany}_Lou,DC={ACManager._myDomain},DC={ACManager._myDomain}";
             DateTime deletionDate = DateTime.Now.AddDays(31);                                                           // Calculate Today's date + 31 days
             string deletionDateString = deletionDate.ToString("MM-dd-yyyy");                                            // Format the date
             bool returnToMenu = false;

@@ -8,6 +8,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Pastel;
 using System.Drawing;
+using Microsoft.Extensions.Configuration;
 
 
 // TODO - DONE User Account Creation: Enable users to create new accounts in Active Directory. 
@@ -18,22 +19,30 @@ namespace ADUtils
     public class AccountCreationManager
     {
 
-        EmailNotifcationManager emailNotifcation = new EmailNotifcationManager(Program.configuration);
+        EmailNotifcationManager emailNotification = new EmailNotifcationManager(Program.configuration);
         AuditLogManager auditLogManager;
-     
-        public AccountCreationManager(AuditLogManager auditLogManager)
+
+        public readonly string _myDomain;
+        public readonly string _myDomainDotCom;
+        private readonly string _myParentOU;
+        public readonly string _myCompany;
+        private readonly string _myExchangeDatabase;
+        private readonly string _myExchangeServer;
+
+        public AccountCreationManager(AuditLogManager auditLogManager, IConfiguration configuration)
         {
             this.auditLogManager = auditLogManager;
-        }
-        public AccountCreationManager() { }
 
-        public string myDomain = Environment.GetEnvironmentVariable("MY_DOMAIN");                                               // Update with your domain
-        public string mydomainDotCom = Environment.GetEnvironmentVariable("MY_DOMAIN.COM");                                     // Update with your second part of your domain (domain(.com))
-        private string myParentOU = Environment.GetEnvironmentVariable("MY_PARENT_OU");                                         // Update with your path of Users OU
-        public string myCompany = Environment.GetEnvironmentVariable("MY_COMPANY");                                             // Update with your company email domain (*@companyName.com)
-        private string myExhcangeDatabase = Environment.GetEnvironmentVariable("MY_EXCHANGE_DATABASE");                         // Update with your Exchange server database
-        private string myExchangeServer = Environment.GetEnvironmentVariable("MY_EXCHANGE_SERVER");                             // Update with your exchange server name.
-        
+            _myDomain = configuration["AccountCreationSettings:myDomain"];                                                      // Update with your domain
+            _myDomainDotCom = configuration["AccountCreationSettings:myDomainDotCom"];                                          // Update with your second part of your domain (domain(.com))
+            _myParentOU = configuration["AccountCreationSettings:myParentOU"];                                                  // Update with your path of Users OU
+            _myCompany = configuration["AccountCreationSettings:myCompany"];                                                    // Update with your company email domain (*@companyName.com)
+            _myExchangeDatabase = configuration["AccountCreationSettings:myExchangeDatabase"];                                  // Update with your Exchange server database
+            _myExchangeServer = configuration["AccountCreationSettings:myExchangeServer"];                                      // Update with your exchange server name.
+
+        }// end of constructor 
+
+        public AccountCreationManager() { }
         public int processSleepTimer = 1000;
 
         private string firstName;
@@ -156,8 +165,8 @@ namespace ADUtils
             firstInitial = Regex.Match(firstName, ".{1,1}").Value;
             lastInitial = Regex.Match(lastName, ".{1,1}").Value;
             username = $"{firstInitial.ToLower()}{lastName.ToLower()}";
-            email = $"{username}@{myCompany}.com";
-            password = $"New_User_{myCompany}_{firstInitial.ToUpper()}{lastInitial.ToUpper()}!";
+            email = $"{username}@{_myCompany}.com";
+            password = $"New_User_{_myCompany}_{firstInitial.ToUpper()}{lastInitial.ToUpper()}!";
             userProfile = $@"\\lmnas-02\users\{username}";
             clsUserFolder = $@"\\lmcls\sys\users\{firstInitial.ToLower()}{lastName.ToLower()}";
 
@@ -172,7 +181,7 @@ namespace ADUtils
                              $"{"Title:", -20} {jobTitle} \n" +
                              $"{"Description:", -20} {description} \n" +
                              $"{"Physical Office:", -20} {office} \n" +
-                             $"{"User Assgined OU:", -20} {targetOU} \n" +
+                             $"{"User Assigned OU:", -20} {targetOU} \n" +
                              $"{"Script Path:", -20} logon.bat \n" +
                              $"{"Home Drive:", -20} P: \n" +
                              $"{"User Home Directory:", -20} {userProfile} \n" +
@@ -189,7 +198,7 @@ namespace ADUtils
                 {
                     isExit = true;
                     Console.WriteLine("User information has been verified. \nCreating user...\n");
-                }// end of if-statemnet
+                }// end of if-statement
                 else
                 {
                     Console.WriteLine("\nReturning to menu....");
@@ -198,14 +207,14 @@ namespace ADUtils
             }// end of while
             try
             {
-                string ouPath = $"LDAP://OU={targetOU},OU={myParentOU},DC={myDomain},DC={mydomainDotCom}";
+                string ouPath = $"LDAP://OU={targetOU},OU={_myParentOU},DC={_myDomain},DC={_myDomainDotCom}";
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
                 {
                     using (UserPrincipal user = new UserPrincipal(context))                                                                     // Creating new User
                     {
                         user.Name = $"{firstName} {lastName}";
                         user.SamAccountName = username;
-                        user.UserPrincipalName = $"{username}@{myCompany}.com";
+                        user.UserPrincipalName = $"{username}@{_myCompany}.com";
                         user.SetPassword(password);
                         user.GivenName = firstName;
                         user.Surname = lastName;
@@ -249,7 +258,7 @@ namespace ADUtils
                 LaunchBRPMgr();                                                                                                                 // Optional: Open BRP manager to create BRP account manually.
                 LaunchVLMMgr();                                                                                                                 // Optional: Open VLM to add CLS license to the user
                 LaunchHostMyCallsSite();                                                                                                        // Optional: Open Hostmycalls site to add EXT
-                LaunchO365Site();                                                                                                               // Optional: Open O365 site to add licesnes to the user.
+                LaunchO365Site();                                                                                                               // Optional: Open O365 site to add licensees to the user.
 
                 string logEntry = ($"New Account has been created \"{firstName} {lastName} | {username}\" in Active Directory\n " +
                                    $"\nUser added to {targetOU} OU and assgined basic groups \n" +
@@ -271,7 +280,7 @@ namespace ADUtils
             if (emailActionLog.Count > 0)
             {
                 string emailBody = string.Join("\n", emailActionLog);
-                emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
+                emailNotification.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
             }// end of if statement
             do
             {
@@ -487,7 +496,7 @@ namespace ADUtils
                 ps.Commands.Clear();
                 ps.AddCommand("New-PSSession");
                 ps.AddParameter("ConfigurationName", "Microsoft.Exchange");
-                ps.AddParameter("ConnectionUri", new Uri($"http://{myExchangeServer}/PowerShell/"));
+                ps.AddParameter("ConnectionUri", new Uri($"http://{_myExchangeServer}/PowerShell/"));
                 ps.AddParameter("Authentication", "Kerberos");
                 ps.AddParameter("Credential", new PSCredential(adminUsername, securePassword));
 
@@ -511,7 +520,7 @@ namespace ADUtils
                 ps.Commands.Clear();
                 ps.AddCommand("Enable-Mailbox");
                 ps.AddParameter("Identity", username);
-                ps.AddParameter("Database", myExhcangeDatabase);
+                ps.AddParameter("Database", _myExchangeDatabase);
 
                 // Invoke Enable-Mailbox
                 ps.Invoke();

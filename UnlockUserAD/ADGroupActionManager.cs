@@ -9,7 +9,7 @@ namespace ADUtils
 
         EmailNotifcationManager emailNotifcation = new EmailNotifcationManager(Program.configuration);
         AuditLogManager auditLogManager;
-
+      
         public ADGroupActionManager(AuditLogManager auditLogManager)
         {
             //auditLogManager.RedirectConsoleOutput();                                                                                                                 // Comment out if you want to log everything in the console ** Does not log password **.

@@ -65,10 +65,10 @@ class Program
                         isAuthenticated = true;
                         Console.WriteLine($"Connected to Active Directory as: {adminUsername}.".Pastel(Color.GreenYellow));
                
-                        auditLogManager = new AuditLogManager(adminUsername);
+                        auditLogManager = new AuditLogManager(adminUsername, configuration);
                         ADGroupManager = new ADGroupActionManager(auditLogManager);
                         PWDManager = new PasswordManager(auditLogManager);
-                        ACManager = new AccountCreationManager(auditLogManager);
+                        ACManager = new AccountCreationManager(auditLogManager, configuration);
 
                         bool exit = false;
                         while (!exit)                                                                                                                                          // Loop the menu

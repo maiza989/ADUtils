@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Configuration;
+using System;
 using System.IO;
 using System.Security.Cryptography.X509Certificates;
 
@@ -6,22 +7,26 @@ namespace ADUtils
 {
     public class AuditLogManager
     {
-
-        private readonly string _BaseLogDirectory;
-        private static readonly string BaseLogDirectory = @"H:\IT\Maitham's Cave\ADUtil\Logs";                                   // Replace with your desire log location 
+        private readonly string _BaseLogDirectory;                                                                                // Replace with your desire log location                                
         private string logFilePath;
 
+/*
+        public AuditLogManager(IConfiguration configuration)
+        {
+            _BaseLogDirectory = configuration["LoggingSettings:BaseLogDirectory"];
+        }*/
 
         /// <summary>
         /// A constructor that create and ensure the for log file exists.
         /// </summary>
         /// <param name="adminUsername"></param>
-        public AuditLogManager(string adminUsername)
+        public AuditLogManager(string adminUsername, IConfiguration configuration)
         {
+            _BaseLogDirectory = configuration["LoggingSettings:BaseLogDirectory"];
             try
             {
-            logFilePath = Path.Combine(BaseLogDirectory, $"{adminUsername}.log");                                                // Create a log file based on the user logged into ADUtil
-            Directory.CreateDirectory(BaseLogDirectory);                                                                         // Ensure the directory exist
+            logFilePath = Path.Combine(_BaseLogDirectory, $"{adminUsername}.log");                                                // Create a log file based on the user logged into ADUtil
+            Directory.CreateDirectory(_BaseLogDirectory);                                                                         // Ensure the directory exist
             InitilizeLogFile();                                                                                                  // Set append mode.
             }// end of try
             catch (Exception ex)
