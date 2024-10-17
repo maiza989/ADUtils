@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Linq;
 using Pastel;
 using System.Drawing;
+using System.Diagnostics.Eventing.Reader;
 
 namespace ADUtils
 {
@@ -49,7 +50,8 @@ namespace ADUtils
                         DirectoryEntry directoryEntry = user.GetUnderlyingObject() as DirectoryEntry;
                         string title = directoryEntry.Properties["title"].Value as string;
                         string department = directoryEntry.Properties["department"].Value as string;
-                 
+
+                        // TODO - Make a check if the password or last logon date are null                        
                         DateTime lastBadPasswordAttemptLocal = TimeZoneInfo.ConvertTimeFromUtc(user.LastBadPasswordAttempt.Value.ToUniversalTime(), TimeZoneInfo.Local);
                         DateTime lastLogonLocal = TimeZoneInfo.ConvertTimeFromUtc(user.LastLogon.Value.ToUniversalTime(), TimeZoneInfo.Local);
                         
@@ -160,7 +162,38 @@ namespace ADUtils
         }// end of UnlockAllUsers
 
         // TODO - grab the lockout event
-       
+
+        private void PrintLockoutEventDetails(string username)
+        {
+            string query = $"*[System/EventID=4740] and *[EventData[Data[@Name='TargetUserName'] and (Data='{username}')]]";
+            EventLogQuery eventsQuery = new EventLogQuery("Security", PathType.LogName, query);
+
+            try
+            {
+                using (EventLogReader logReader = new EventLogReader(eventsQuery))
+                {
+                    EventRecord eventRecord = logReader.ReadEvent();
+                    if (eventRecord != null)
+                    {
+                        // Extract relevant details
+                        string workstation = eventRecord.Properties[1].Value.ToString();
+                        string lockedUser = eventRecord.Properties[0].Value.ToString();
+                        DateTime? lockoutTime = eventRecord.TimeCreated;
+
+                        Console.WriteLine($"\tAccount: {lockedUser} was locked on workstation: {workstation} at {lockoutTime}".Pastel(Color.Gold));
+                    }
+                    else
+                    {
+                        Console.WriteLine($"\tNo lockout events found for {username}.".Pastel(Color.OrangeRed));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching lockout details: {ex.Message}".Pastel(Color.IndianRed));
+            }
+        }
+
         /// <summary>
         /// A method to check if any user is locked in Active Directory.
         /// </summary>
@@ -177,7 +210,26 @@ namespace ADUtils
                     UserPrincipal user = result as UserPrincipal;
                     if (user != null && user.IsAccountLockedOut())                                                                              // Print out all locked users
                     {
-                        Console.WriteLine($"\t- {user.SamAccountName}".Pastel(Color.Crimson));
+                        DirectoryEntry directoryEntry = (user.GetUnderlyingObject() as DirectoryEntry);
+                        if (directoryEntry.Properties.Contains("lockoutTime") && directoryEntry.Properties["lockoutTime"].Value != null  )
+                        {
+                          
+                            long lockoutTimeValue = (long)directoryEntry.Properties["lockoutTime"].Value;
+                            try
+                            {                       
+                                    DateTime lockoutTime = DateTime.FromFileTime(lockoutTimeValue);
+                                    Console.WriteLine($"\t- {user.SamAccountName} | {lockoutTime}".Pastel(Color.Crimson));
+                            }
+                            catch(InvalidCastException ex)
+                            {
+                                Console.WriteLine($"Error cassting lockoutTime\tError: {ex.Message}");
+                            }
+                        }// end of if-statement
+                        else
+                        {
+                            Console.WriteLine($"\t- {user.SamAccountName}".Pastel(Color.Crimson));
+                        }
+                       // PrintLockoutEventDetails(user.SamAccountName);
                         isAnyLocked = true;
                     }// end of if-statement
                 }// end of foreach

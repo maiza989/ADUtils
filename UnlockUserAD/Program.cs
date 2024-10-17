@@ -52,7 +52,6 @@ class Program
             .Build();
         EmailNotifcationManager emailManager = new EmailNotifcationManager(configuration);
        
-
         do
         {
         GetAdminCreditials();

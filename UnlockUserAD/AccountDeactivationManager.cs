@@ -14,8 +14,8 @@ namespace ADUtils
         {
             
             string ouPath = $"LDAP://OU=Ex Employee,OU={ACManager._myCompany}_Lou,DC={ACManager._myDomain},DC={ACManager._myDomain}";
-            DateTime deletionDate = DateTime.Now.AddDays(31);                                                           // Calculate Today's date + 31 days
-            string deletionDateString = deletionDate.ToString("MM-dd-yyyy");                                            // Format the date
+            DateTime deletionDate = DateTime.Now.AddDays(31);                                                                           // Calculate Today's date + 31 days
+            string deletionDateString = deletionDate.ToString("MM-dd-yyyy");                                                            // Format the date
             bool returnToMenu = false;
 
             do
@@ -48,7 +48,7 @@ namespace ADUtils
                             if (user.Enabled == true)
                             {
                                 user.Enabled = false;                                                                                   // Disabling the user account
-                                user.Description = $"Delete on {deletionDateString}";                                                   // Change discription with reminder of when to delete the ex user account
+                                user.Description = $"Delete on {deletionDateString}";                                                   // Change description with reminder of when to delete the ex user account
                                 user.Save();
                                 Console.WriteLine($"User account '{username}' has been disabled\nAccount description changed to 'Delete on {deletionDateString}!".Pastel(Color.LimeGreen));
 
@@ -61,7 +61,7 @@ namespace ADUtils
                                     startOU.MoveTo(endOU);
                                     Console.WriteLine($"User account '{username}' has been moved to Ex Employee OU".Pastel(Color.LimeGreen));
                                 }// end of using
-                            }// end of if statetment
+                            }// end of if statement
                             else
                             {
                                 Console.WriteLine($"User account '{username}' is {"ALREADY".Pastel(Color.MediumPurple)} disabled".Pastel(Color.DarkGoldenrod));

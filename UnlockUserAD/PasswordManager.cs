@@ -141,7 +141,7 @@ namespace ADUtils
                     if (user != null)
                     {
                         DateTime expirationDate = GetPasswordExpirationDate(user);                                                                               // Calculate password experation date
-                        DateTime lastSetDate = GetPasswordLastSetDate(user);                                                                                     // Calculate password last time it was set
+                        DateTime? lastSetDate = GetPasswordLastSetDate(user);                                                                                     // Calculate password last time it was set
 
                         Console.ForegroundColor = ConsoleColor.DarkCyan;
                         Console.WriteLine($"\tPassword last set date for user '{username}': {lastSetDate}");
@@ -197,11 +197,17 @@ namespace ADUtils
         /// </summary>
         /// <param name="user"> Uses user Object in AD</param>
         /// <returns>Password last changed</returns>
-        public DateTime GetPasswordLastSetDate(UserPrincipal user)
+        public DateTime? GetPasswordLastSetDate(UserPrincipal user)
         {
             DirectoryEntry deUser = (DirectoryEntry)user.GetUnderlyingObject();
             ActiveDs.IADsUser nativeDeUser = (ActiveDs.IADsUser)deUser.NativeObject;
             DateTime passwordLastChanged = nativeDeUser.PasswordLastChanged;
+
+            if(passwordLastChanged == null)
+            {
+                Console.WriteLine("Check if the password was never set");
+                return null;
+            }
             
             return passwordLastChanged;                                                                                                       // Return the password last time it changed for the user
         }// end of getPaswordLastSetDate
