@@ -211,7 +211,8 @@ namespace ADUtils
                     if (user != null && user.IsAccountLockedOut())                                                                              // Print out all locked users
                     {
                         DirectoryEntry directoryEntry = (user.GetUnderlyingObject() as DirectoryEntry);
-                        if (directoryEntry.Properties.Contains("lockoutTime") && directoryEntry.Properties["lockoutTime"].Value != null  )
+                        // TODO - Fix grabbing time lock out for users.
+                        /*if (directoryEntry.Properties.Contains("lockoutTime") && directoryEntry.Properties["lockoutTime"].Value != null  )
                         {
                           
                             long lockoutTimeValue = (long)directoryEntry.Properties["lockoutTime"].Value;
@@ -228,8 +229,9 @@ namespace ADUtils
                         else
                         {
                             Console.WriteLine($"\t- {user.SamAccountName}".Pastel(Color.Crimson));
-                        }
-                       // PrintLockoutEventDetails(user.SamAccountName);
+                        }*/
+                        Console.WriteLine($"\t- {user.SamAccountName}".Pastel(Color.Crimson));
+                        // PrintLockoutEventDetails(user.SamAccountName);
                         isAnyLocked = true;
                     }// end of if-statement
                 }// end of foreach

@@ -13,7 +13,7 @@ using System.Runtime.InteropServices;
 
 
 // TODO - DONE User Account Creation: Enable users to create new accounts in Active Directory. 
-// TODO - Fix moving users to correct OU for MI and GA users. Need a switch case to select the correct OU parent. 
+// TODO - DONE Fix moving users to correct OU for MI and GA users. Need a switch case to select the correct OU parent. 
 namespace ADUtils
 {
     
@@ -55,6 +55,7 @@ namespace ADUtils
         private string office;
         private string manager;
         private string targetOU;
+        private string targetOUSelection;      
         private string firstInitial;
         private string lastInitial;
         private string username;
@@ -93,7 +94,6 @@ namespace ADUtils
             Console.Write("Enter user office (KY, MI, GA, or Remote): ");
             office = Console.ReadLine().Trim();
 
-
             /*Console.Write("Enter user manager (SAM Account Name): ");
             manager = Console.ReadLine();*/
 
@@ -111,54 +111,54 @@ namespace ADUtils
                         validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice >= 1 && choice <= 6;
                         if (!validInput) Console.WriteLine("Invalid input, please enter a number between 1 and 6.");
                     } while(!validInput);
-                    targetOU = choice.ToString();
+                    targetOUSelection = choice.ToString();
                     break;
                 case "MI":
                     do
                     {
-                        Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)} or {"Full Name".Pastel(Color.MediumPurple)} " +
-                                          $"\n 7- Michigan_Users");
+                        Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
+                                          $"\n 7- Michigan Users");
                         Console.Write("Enter your choice:");
                         validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice == 7;
                         if (!validInput) Console.WriteLine("Invalid input, please enter 7.");
                     } while (!validInput);
-                    targetOU = choice.ToString();   
+                    targetOUSelection = choice.ToString();   
                     break;
                 case "GA":
                     do
                     {
-                        Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)} or {"Full Name".Pastel(Color.MediumPurple)} " +
-                                          $"\n 8- Cooling_Users\n 9- Cooling_User_Collector\n 10- Cooling_User_Staff\n 11- Cooling_User_Atty\n 12- Cooling_User_Acct");
+                        Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
+                                          $"\n 8- Default Georgia Users\n 9- Georgia Collector\n 10- Georgia Admin Staff\n 11- Georgia Atty\n 12- Georgia Accounting");
                         Console.Write("Enter your choice: ");
                         validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice >= 8 && choice <= 12;
                         if (!validInput) Console.WriteLine("Invalid input, please enter a number between 8 and 12.");
                     } while (!validInput);
-                    targetOU = choice.ToString();
+                    targetOUSelection = choice.ToString();
                     break;
                 case "REMOTE":
                     do
                     {
-                        Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)} or {"Full Name".Pastel(Color.MediumPurple)} " +
+                        Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
                                           $"\n( 1- IT\n 2- Collector\n 3- Admin Staff\n 4- Atty\n 5- Acct\n 6- Compliance\n " +
-                                          $"7- Michigan_Users\n 8- Cooling_Users)\n");
+                                          $"7- Michigan Users\n 8- GA Users)\n");
                         Console.Write("Enter your choice: ");
                         validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice >= 1 && choice <= 8;
                         if (!validInput) Console.WriteLine("Invalid input, please enter a number between 1 and 8.");
                     } while (!validInput);
-                    targetOU = choice.ToString();
+                    targetOUSelection = choice.ToString();
                     break;
                 default:
                     
-                    Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)} or {"Full Name".Pastel(Color.MediumPurple)} " +
+                    Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
                                       $"\n( 1- IT\n 2- Collector\n 3- Admin Staff\n 4- Atty\n 5- Acct\n 6- Compliance\n " +
-                                      $"7- Michigan_Users\n " +
-                                      $"8- Cooling_Users)\n");
+                                      $"7- Michigan Users\n " +
+                                      $"8- Georgia Users)\n");
                     Console.Write("Enter your choice:");
-                    targetOU = Console.ReadLine().Trim();
+                    targetOUSelection = Console.ReadLine().Trim();
                     break;
             }// end of switch
            
-            switch (targetOU)
+            switch (targetOUSelection)
             {
                 case "1":                                               // KY users
                     targetOU = "IT";
@@ -228,6 +228,7 @@ namespace ADUtils
                              $"{"Description:", -20} {description} \n" +
                              $"{"Physical Office:", -20} {office} \n" +
                              $"{"User Assigned OU:", -20} {targetOU} \n" +
+                             $"{"User Parent OU", -20} {_myParentOU} \n" + 
                              $"{"Script Path:", -20} logon.bat \n" +
                              $"{"Home Drive:", -20} P: \n" +
                              $"{"User Home Directory:", -20} {userProfile} \n" +
@@ -252,7 +253,6 @@ namespace ADUtils
                 }// end of else-statement
             }// end of while
             
-         
             try
             {
                 if (targetOU == "")
@@ -264,7 +264,7 @@ namespace ADUtils
                 {
                    ouPath = $"LDAP://OU={targetOU},OU={_myParentOU},DC={_myDomain},DC={_myDomainDotCom}";
                 }// end of else statement
-                // TODO - fix the traget and parent OU for GA and MI user. Currently the parent OU only works for KY users.
+                // TODO - DONE fix the traget and parent OU for GA and MI user. Currently the parent OU only works for KY users.
                    
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
                 {
@@ -417,8 +417,9 @@ namespace ADUtils
         /// <param name="targetOu">The distinguished name of the target OU.</param>
         private void AddNewUserToGroups(string username, string targetOu, string adminUsername, string adminPassword)
         {
+            // Section to add more group types
             Thread.Sleep(processSleepTimer);
-            string[] groups = null;
+            string[] groups = null;                                                                                                                                                                // Change the group var name and value to match your needs
             string[] itGroups = { "_COLLECT", "_COLLECTKY", "_Training", "IT", "LM_IT" };                                                                                                          // 1
             string[] collectorGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Collectors", "LM_Collector", "NoOutboundEmail" };                                                                 // 2
             string[] adminStaffGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Administrative", "Staff" };                                                                                      // 3
@@ -433,21 +434,19 @@ namespace ADUtils
             string[] gorgiaAcctUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "LM_Accounting", "NoAccountingEmail", "Horizon_Accounting_RDS_Users" };                      // 12
 
 
-
-            if (targetOu.Contains("IT") || targetOu.Contains("1")) groups = itGroups;
-            else if (targetOu.Contains("Collector") || targetOu.Contains("2")) groups = collectorGroups;
-            else if (targetOu.Contains("Admin Staff") || targetOu.Contains("3")) groups = adminStaffGroups;
-            else if (targetOu.Contains("Atty") || targetOu.Contains("4")) groups = attyGroups;
-            else if (targetOu.Contains("Acct") || targetOu.Contains("5")) groups = acctGroups;
-            else if (targetOu.Contains("Compliance") || targetOu.Contains("6")) groups = complianceGroups;
-            else if (targetOu.Contains("Michigan_Users") || targetOu.Contains("7")) groups = michiganUsersGroups;
-            else if (targetOu.Contains("Cooling_Users") || targetOu.Contains("8")) groups = gorgiaUsersGroups;
-            else if (targetOu.Contains("Cooling_User_Collector") || targetOu.Contains("9")) groups = gorgiaCollectorUsersGroups;
-            else if (targetOu.Contains("Cooling_User_Staff") || targetOu.Contains("10")) groups = gorgiaAdminStaffUsersGroups;
-            else if (targetOu.Contains("Cooling_User_Atty") || targetOu.Contains("11")) groups = gorgiaAttyUsersGroups;
-            else if (targetOu.Contains("Cooling_User_Acct") || targetOu.Contains("12")) groups = gorgiaAcctUsersGroups;
-
-
+            // section to determine which group type the user is assigned. 
+            if (targetOu.Contains("IT") || targetOUSelection.Contains("1")) groups = itGroups;
+            else if (targetOu.Contains("Collector") || targetOUSelection.Contains("2")) groups = collectorGroups;
+            else if (targetOu.Contains("Admin Staff") || targetOUSelection.Contains("3")) groups = adminStaffGroups;
+            else if (targetOu.Contains("Atty") || targetOUSelection.Contains("4")) groups = attyGroups;
+            else if (targetOu.Contains("Acct") || targetOUSelection.Contains("5")) groups = acctGroups;
+            else if (targetOu.Contains("Compliance") || targetOUSelection.Contains("6")) groups = complianceGroups;
+            else if (targetOu.Contains("Michigan_Users") || _myParentOU.Contains("Michigan_Users") || targetOUSelection.Contains("7")) groups = michiganUsersGroups;
+            else if (targetOu.Contains("Cooling_Users") || _myParentOU.Contains("Michigan_Users") || targetOUSelection.Contains("8")) groups = gorgiaUsersGroups;
+            else if (targetOu.Contains("Cooling_User_Collector") || _myParentOU.Contains("Cooling_Users") || targetOUSelection.Contains("9")) groups = gorgiaCollectorUsersGroups;
+            else if (targetOu.Contains("Cooling_User_Staff") || _myParentOU.Contains("Cooling_Users") || targetOUSelection.Contains("10")) groups = gorgiaAdminStaffUsersGroups;
+            else if (targetOu.Contains("Cooling_User_Atty") || _myParentOU.Contains("Cooling_Users") || targetOUSelection.Contains("11")) groups = gorgiaAttyUsersGroups;
+            else if (targetOu.Contains("Cooling_User_Acct") || _myParentOU.Contains("Cooling_Users") || targetOUSelection.Contains("12")) groups = gorgiaAcctUsersGroups;
 
 
             if (groups != null)
