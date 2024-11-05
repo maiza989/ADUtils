@@ -54,6 +54,7 @@ namespace ADUtils
         private string description;
         private string office;
         private string manager;
+        private string managerDN;
         private string targetOU;
         private string targetOUSelection;      
         private string firstInitial;
@@ -94,8 +95,8 @@ namespace ADUtils
             Console.Write("Enter user office (KY, MI, GA, or Remote): ");
             office = Console.ReadLine().Trim();
 
-            /*Console.Write("Enter user manager (SAM Account Name): ");
-            manager = Console.ReadLine();*/
+            Console.Write("Enter user manager (SAM Account Name): ");
+            manager = Console.ReadLine();
 
             //TODO - redo the selection of user creation This need to be do to create user with Horizon access if user is GA, MI or KY Remote
             int choice;
@@ -267,7 +268,7 @@ namespace ADUtils
                 // TODO - DONE fix the traget and parent OU for GA and MI user. Currently the parent OU only works for KY users.
                    
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
-                {
+                {  
                     using (UserPrincipal user = new UserPrincipal(context))                                                                     // Creating new User
                     {
                         user.Name = $"{firstName} {lastName}";
@@ -294,7 +295,16 @@ namespace ADUtils
                             userEntry.Properties["title"].Value = jobTitle;
                             userEntry.Properties["department"].Value = departmentEntry;
                             userEntry.Properties["physicalDeliveryOfficeName"].Value = office;
-                            //userEntry.Properties["manager"].Value = manager;
+
+                            try
+                            {
+                                CheckManagerDN(); 
+                                userEntry.Properties["manager"].Value = managerDN;
+                            }
+                            catch(Exception ex)
+                            {
+                                Console.WriteLine($"An error occurred while filling manager field for the user: {ex.Message}");
+                            }
                             userEntry.CommitChanges();
                             try
                             {
@@ -303,7 +313,7 @@ namespace ADUtils
                             }
                             catch (COMException ex)
                             {
-                                Console.WriteLine($"An error occured while moving the user to the traget OU: {ex.Message}");
+                                Console.WriteLine($"An error occurred while moving the user to the traget OU: {ex.Message}");
                             }
                         }// end of using
 
@@ -420,19 +430,28 @@ namespace ADUtils
             // Section to add more group types
             Thread.Sleep(processSleepTimer);
             string[] groups = null;                                                                                                                                                                // Change the group var name and value to match your needs
-            string[] itGroups = { "_COLLECT", "_COLLECTKY", "_Training", "IT", "LM_IT" };                                                                                                          // 1
-            string[] collectorGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Collectors", "LM_Collector", "NoOutboundEmail" };                                                                 // 2
-            string[] adminStaffGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Administrative", "Staff" };                                                                                      // 3
-            string[] attyGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Attorneys", "LM_Atty" };                                                                                               // 4
-            string[] acctGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Accounting", "LM_Accounting", "NoAccountingEmail" };                                                                   // 5
-            string[] complianceGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Compliance" };                                                                                                   // 6
-            string[] michiganUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "MI_All_Users_Printers" };                                                             // 7
-            string[] gorgiaUsersGroups = {"_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice"};                                                                                                  // 8
-            string[] gorgiaCollectorUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "Collectors", "LM_Collector", "NoOutboundEmail", "Horizon_Collector_RDS_Users" };       // 9
-            string[] gorgiaAdminStaffUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "Administrative", "Staff", "Horizon_RDS_Desktop_Users" };                              // 10
-            string[] gorgiaAttyUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "Attorneys", "LM_Atty", "Horizon_Attorney_RDS_Users" };                                      // 11
-            string[] gorgiaAcctUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "LM_Accounting", "NoAccountingEmail", "Horizon_Accounting_RDS_Users" };                      // 12
-
+            // KY
+            string[] itGroups = { "_COLLECT", "_COLLECTKY", "_Training", "IT", "LM_IT" };                                                                                                           // 1
+            string[] collectorGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Collectors", "LM_Collector", "NoOutboundEmail" };                                                                  // 2
+            string[] adminStaffGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Administrative", "Staff" };                                                                                       // 3
+            string[] attyGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Attorneys", "LM_Atty" };                                                                                                // 4
+            string[] acctGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Accounting", "LM_Accounting", "NoAccountingEmail" };                                                                    // 5
+            string[] complianceGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Compliance" };                                                                                                    // 6
+            // MI
+            string[] michiganUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "MI_All_Users_Printers" };                                                              // 7
+            // GA
+            string[] georgiaUsersGroups = {"_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice"};                                                                                                  // 8
+            string[] georgiaCollectorUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "Collectors", "LM_Collector", "NoOutboundEmail", "Horizon_Collector_RDS_Users" };       // 9
+            string[] georgiaAdminStaffUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "Administrative", "Staff", "Horizon_RDS_Desktop_Users" };                              // 10
+            string[] georgiaAttyUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "Attorneys", "LM_Atty", "Georgia attorneys", "Horizon_Attorney_RDS_Users" };                 // 11
+            string[] georgiaAcctUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "LM_Accounting", "NoAccountingEmail", "Horizon_Accounting_RDS_Users" };                      // 12
+            // Remote
+            string[] KYRITGroups = { "_COLLECT", "_COLLECTKY", "_Training", "IT", "LM_IT", "Horizon_IT_User" };
+            string[] KYRCollectorGorups = { "_COLLECT", "_COLLECTKY", "_Training", "Collectors", "LM_Collector", "NoOutboundEmail", "Horizon_Collector_RDS_Users" };
+            string[] KYRadminStaffGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Administrative", "Staff", "Horizon_RDS_Desktop_Users"};
+            string[] KYRAttyGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Attorneys", "LM_Atty", "Horizon_Attorney_RDS_Users" };
+            string[] KYRAcctGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Accounting", "LM_Accounting", "NoAccountingEmail", "Horizon_Accounting_RDS_Users" };
+            string[] KYRComplianceGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Compliance", "Horizon_RDS_Desktop_Users" };
 
             // section to determine which group type the user is assigned. 
             if (targetOu.Contains("IT") || targetOUSelection.Contains("1")) groups = itGroups;
@@ -441,12 +460,12 @@ namespace ADUtils
             else if (targetOu.Contains("Atty") || targetOUSelection.Contains("4")) groups = attyGroups;
             else if (targetOu.Contains("Acct") || targetOUSelection.Contains("5")) groups = acctGroups;
             else if (targetOu.Contains("Compliance") || targetOUSelection.Contains("6")) groups = complianceGroups;
-            else if (targetOu.Contains("Michigan_Users") || _myParentOU.Contains("Michigan_Users") || targetOUSelection.Contains("7")) groups = michiganUsersGroups;
-            else if (targetOu.Contains("Cooling_Users") || _myParentOU.Contains("Michigan_Users") || targetOUSelection.Contains("8")) groups = gorgiaUsersGroups;
-            else if (targetOu.Contains("Cooling_User_Collector") || _myParentOU.Contains("Cooling_Users") || targetOUSelection.Contains("9")) groups = gorgiaCollectorUsersGroups;
-            else if (targetOu.Contains("Cooling_User_Staff") || _myParentOU.Contains("Cooling_Users") || targetOUSelection.Contains("10")) groups = gorgiaAdminStaffUsersGroups;
-            else if (targetOu.Contains("Cooling_User_Atty") || _myParentOU.Contains("Cooling_Users") || targetOUSelection.Contains("11")) groups = gorgiaAttyUsersGroups;
-            else if (targetOu.Contains("Cooling_User_Acct") || _myParentOU.Contains("Cooling_Users") || targetOUSelection.Contains("12")) groups = gorgiaAcctUsersGroups;
+            else if (targetOu.Contains("Michigan_Users") || _myParentOU.Contains("Michigan_Users") && targetOUSelection.Contains("7")) groups = michiganUsersGroups;
+            else if (targetOu.Contains("Cooling_Users") || _myParentOU.Contains("Cooling_Users") && targetOUSelection.Contains("8")) groups = georgiaUsersGroups;
+            else if (targetOu.Contains("Cooling_User_Collector") || _myParentOU.Contains("Cooling_Users") && targetOUSelection.Contains("9")) groups = georgiaCollectorUsersGroups;
+            else if (targetOu.Contains("Cooling_User_Staff") || _myParentOU.Contains("Cooling_Users") && targetOUSelection.Contains("10")) groups = georgiaAdminStaffUsersGroups;
+            else if (targetOu.Contains("Cooling_User_Atty") || _myParentOU.Contains("Cooling_Users") && targetOUSelection.Contains("11")) groups = georgiaAttyUsersGroups;
+            else if (targetOu.Contains("Cooling_User_Acct") || _myParentOU.Contains("Cooling_Users") && targetOUSelection.Contains("12")) groups = georgiaAcctUsersGroups;
 
 
             if (groups != null)
@@ -703,5 +722,23 @@ namespace ADUtils
             }
             Console.WriteLine();
         }
+        private void CheckManagerDN()
+        {
+            using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
+            {
+                using (var managerPrincipal = UserPrincipal.FindByIdentity(context, manager))
+                {
+                    if (managerPrincipal != null)
+                    {
+                        // Retrieve the underlying DirectoryEntry for the manager
+                        DirectoryEntry directoryEntry = (DirectoryEntry)managerPrincipal.GetUnderlyingObject();
+
+                        // Get the Distinguished Name (DN)
+                        managerDN = directoryEntry.Properties["distinguishedName"].Value.ToString();
+                        Console.WriteLine($"Manager found: {managerPrincipal.DisplayName} (DN: {managerDN})");
+                    }
+                }
+            }
+        }// end of CheckManagerDN
     }// end of class
 }// end of namespace

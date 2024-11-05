@@ -4,6 +4,8 @@ using ADUtils;
 using Pastel;
 using System.Drawing;
 using Microsoft.Extensions.Configuration;
+using System.Security.Cryptography.X509Certificates;
+using System.Security.Cryptography;
 // TODO - DONE - Audit Logging: Log fuction to record important action performed.
 // TODO - DONE User Account Deactivation: Implement functionality to deactivate user accounts securely.
 // TODO - Create/Delete Groups: Allow creating and deleting security groups or distribution lists.
@@ -29,14 +31,95 @@ class Program
     static private bool isAuthenticated = false;
     public static IConfiguration configuration;
 
-    static void GetAdminCreditials()
+   /* static void GetAdminCreditials()
     {
 
         Console.Write("Enter admin username: ");
         adminUsername = Console.ReadLine().Trim();
         Console.Write("Enter admin password: ");
         adminPassword = PasswordManager.GetPassword().Trim();
-    }
+    }*/
+
+    static X509Certificate2 GetAdminCertificate()
+    {
+        Console.Write("Enter admin username: ");
+        adminUsername = Console.ReadLine().Trim();
+
+       /* Console.Write("Enter your smart card PIN: ");
+        string smartCardPin = PasswordManager.GetPassword().Trim();*/
+
+        using (X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
+        {
+            store.Open(OpenFlags.ReadOnly);
+
+           /* // Find certificates that are valid, have the correct key usage, and potentially filter by Issuer or Subject Name
+            X509Certificate2Collection certCollection = store.Certificates                                                  
+                .Find(X509FindType.FindByTimeValid, DateTime.Now, false)
+                .Find(X509FindType.FindByKeyUsage, X509KeyUsageFlags.DigitalSignature, false);
+           */
+
+            // Optionally add more filtering criteria specific to your YubiKey
+            X509Certificate2Collection yubiKeyCerts = new X509Certificate2Collection();
+            foreach (var cert in store.Certificates)
+            {
+                // First, check if the subject name matches the admin username
+                string subjectName = cert.GetNameInfo(X509NameType.SimpleName, false);
+                if (!subjectName.Equals(adminUsername, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Skip this certificate if the subject does not match
+                    continue;
+                }
+                try
+                {
+                    if (cert.HasPrivateKey)
+                    {
+                        // Access the private key
+                        var privateKey = cert.PrivateKey;
+
+                        if (privateKey is RSACng rsaCng)
+                        {
+                            if (rsaCng.KeyExchangeAlgorithm.Equals("RSA", StringComparison.OrdinalIgnoreCase))
+                            {
+                                // Attempt to get the Key Storage Provider (KSP) information, if it exists
+                                if (subjectName.Equals(adminUsername, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    // Attempt to sign data with the RSA key to validate access
+                                    byte[] dataToSign = new byte[] { 0x01 }; // Dummy data
+                                    byte[] signedData = rsaCng.SignData(dataToSign, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                                    yubiKeyCerts.Add(cert);
+                                }// end of if-statement
+                            }
+                        }
+                    }// end of if-statement
+                }// end of try
+                catch
+                {
+                    continue;
+                }// end of catch
+            }// end of foreach
+
+            if (yubiKeyCerts.Count == 0)
+            {
+                Console.WriteLine("No smart card detected or no valid certificates found on the connected smart card.");
+                return null;
+            }
+
+            X509Certificate2 selectedCert = null;
+            if (yubiKeyCerts.Count > 0)
+            {
+                selectedCert = X509Certificate2UI.SelectFromCollection(
+                    yubiKeyCerts,
+                    "Select a YubiKey certificate",
+                    "Please select your admin certificate from the YubiKey",
+                    X509SelectionFlag.SingleSelection
+                )[0];
+            }
+            adminUsername = selectedCert.GetNameInfo(X509NameType.SimpleName, false);
+            adminPassword = selectedCert.PrivateKey.SignatureAlgorithm;
+            return selectedCert;
+        }// end of using x509Store
+    }// end of GetAdminCertificate
+
     static void Main(string[] args)
     {
         ActiveDirectoryManager ADManager = new ActiveDirectoryManager();
@@ -51,13 +134,15 @@ class Program
             .AddJsonFile("Appsettings.json", optional: false, reloadOnChange: true)
             .Build();
         EmailNotifcationManager emailManager = new EmailNotifcationManager(configuration);
-       
+        string _myDomainName = configuration["AccountCreationSettings:myDomainName"];
+
         do
         {
-        GetAdminCreditials();
+        GetAdminCertificate();
+            
             try
             {
-                using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))                                               // Check if the the password/user are correct
+                using (PrincipalContext context = new PrincipalContext(ContextType.Domain, _myDomainName))                                               // Check if the the password/user are correct
                 {
                     if (context.ConnectedServer != null)                                                                                                                      // Throw error if the password/username is incorrect        
                     {
