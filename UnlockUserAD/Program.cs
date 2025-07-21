@@ -5,7 +5,15 @@ using Pastel;
 using System.Drawing;
 using Microsoft.Extensions.Configuration;
 using System.Security.Cryptography.X509Certificates;
+using Yubico.YubiKey.Piv;
 using System.Security.Cryptography;
+using System.Net.Security;
+using System.Net;
+using System.Security.Principal;
+using Yubico.YubiKey;
+using System.Runtime.ConstrainedExecution;
+using System.Text;
+using System.DirectoryServices.Protocols;
 // TODO - DONE - Audit Logging: Log fuction to record important action performed.
 // TODO - DONE User Account Deactivation: Implement functionality to deactivate user accounts securely.
 // TODO - Create/Delete Groups: Allow creating and deleting security groups or distribution lists.
@@ -30,104 +38,27 @@ class Program
     private static string adminPassword;
     static private bool isAuthenticated = false;
     public static IConfiguration configuration;
+    static X509Certificate2 selectedCert;
 
-   /* static void GetAdminCreditials()
+
+    static void GetAdminCreditials()
     {
 
         Console.Write("Enter admin username: ");
         adminUsername = Console.ReadLine().Trim();
         Console.Write("Enter admin password: ");
         adminPassword = PasswordManager.GetPassword().Trim();
-    }*/
+    }
 
-    static X509Certificate2 GetAdminCertificate()
-    {
-        Console.Write("Enter admin username: ");
-        adminUsername = Console.ReadLine().Trim();
-
-       /* Console.Write("Enter your smart card PIN: ");
-        string smartCardPin = PasswordManager.GetPassword().Trim();*/
-
-        using (X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
-        {
-            store.Open(OpenFlags.ReadOnly);
-
-           /* // Find certificates that are valid, have the correct key usage, and potentially filter by Issuer or Subject Name
-            X509Certificate2Collection certCollection = store.Certificates                                                  
-                .Find(X509FindType.FindByTimeValid, DateTime.Now, false)
-                .Find(X509FindType.FindByKeyUsage, X509KeyUsageFlags.DigitalSignature, false);
-           */
-
-            // Optionally add more filtering criteria specific to your YubiKey
-            X509Certificate2Collection yubiKeyCerts = new X509Certificate2Collection();
-            foreach (var cert in store.Certificates)
-            {
-                // First, check if the subject name matches the admin username
-                string subjectName = cert.GetNameInfo(X509NameType.SimpleName, false);
-                if (!subjectName.Equals(adminUsername, StringComparison.OrdinalIgnoreCase))
-                {
-                    // Skip this certificate if the subject does not match
-                    continue;
-                }
-                try
-                {
-                    if (cert.HasPrivateKey)
-                    {
-                        // Access the private key
-                        var privateKey = cert.PrivateKey;
-
-                        if (privateKey is RSACng rsaCng)
-                        {
-                            if (rsaCng.KeyExchangeAlgorithm.Equals("RSA", StringComparison.OrdinalIgnoreCase))
-                            {
-                                // Attempt to get the Key Storage Provider (KSP) information, if it exists
-                                if (subjectName.Equals(adminUsername, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    // Attempt to sign data with the RSA key to validate access
-                                    byte[] dataToSign = new byte[] { 0x01 }; // Dummy data
-                                    byte[] signedData = rsaCng.SignData(dataToSign, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-                                    yubiKeyCerts.Add(cert);
-                                }// end of if-statement
-                            }
-                        }
-                    }// end of if-statement
-                }// end of try
-                catch
-                {
-                    continue;
-                }// end of catch
-            }// end of foreach
-
-            if (yubiKeyCerts.Count == 0)
-            {
-                Console.WriteLine("No smart card detected or no valid certificates found on the connected smart card.");
-                return null;
-            }
-
-            X509Certificate2 selectedCert = null;
-            if (yubiKeyCerts.Count > 0)
-            {
-                selectedCert = X509Certificate2UI.SelectFromCollection(
-                    yubiKeyCerts,
-                    "Select a YubiKey certificate",
-                    "Please select your admin certificate from the YubiKey",
-                    X509SelectionFlag.SingleSelection
-                )[0];
-            }
-            adminUsername = selectedCert.GetNameInfo(X509NameType.SimpleName, false);
-            adminPassword = selectedCert.PrivateKey.SignatureAlgorithm;
-            return selectedCert;
-        }// end of using x509Store
-    }// end of GetAdminCertificate
 
     static void Main(string[] args)
     {
         ActiveDirectoryManager ADManager = new ActiveDirectoryManager();
         AccountCreationManager ACManager;
-        AccountDeactivationManager ACCDeactivationManager = new AccountDeactivationManager();
         PasswordManager PWDManager = null;
         ADGroupActionManager ADGroupManager = null;
         AuditLogManager auditLogManager = null;
+        AccountDeactivationManager ACCDeactivationManager = new AccountDeactivationManager();
 
         configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
@@ -136,19 +67,23 @@ class Program
         EmailNotifcationManager emailManager = new EmailNotifcationManager(configuration);
         string _myDomainName = configuration["AccountCreationSettings:myDomainName"];
 
+        Console.WriteLine("Starting Active Directory Manager...");
+
         do
-        {
-        GetAdminCertificate();
-            
+        { 
             try
             {
-                using (PrincipalContext context = new PrincipalContext(ContextType.Domain, _myDomainName))                                               // Check if the the password/user are correct
+                GetAdminCreditials(); 
+
+                using (PrincipalContext context = new PrincipalContext(ContextType.Domain, _myDomainName, adminUsername, adminPassword))                                                               // Check if the the password/user are correct
                 {
-                    if (context.ConnectedServer != null)                                                                                                                      // Throw error if the password/username is incorrect        
+
+                    if (context.ConnectedServer != null)                                                                                                                // Throw error if the password/username is incorrect        
                     {
+
                         isAuthenticated = true;
-                        Console.WriteLine($"Connected to Active Directory as: {adminUsername}.".Pastel(Color.GreenYellow));
-               
+                        Console.WriteLine($"Connected to Active Directory as: {context.UserName}.".Pastel(Color.GreenYellow));
+
                         auditLogManager = new AuditLogManager(adminUsername, configuration);
                         ADGroupManager = new ADGroupActionManager(auditLogManager);
                         PWDManager = new PasswordManager(auditLogManager);
@@ -164,9 +99,9 @@ class Program
                     }// end of if statement
                     context.Dispose();
                 }// end of using
-            }// end of Try-Catch
+            }// end of try
             catch (DirectoryServicesCOMException)                                                                                                                              // Error out if password/username are incorrect
-            {         
+            {
                 Console.WriteLine("Error: Unable to connect to the Active Directory server. Please check your credentials and try again.".Pastel(Color.IndianRed));
             }
             catch (Exception ex)
@@ -176,7 +111,7 @@ class Program
         } while (!isAuthenticated || string.IsNullOrEmpty(adminUsername));                                                                                                                                            // Repeat until a valid password is entered
     }// end of Main Method
 
-
+   
     //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     //                                                                                                          UI
     //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -280,7 +215,9 @@ class Program
             Console.WriteLine("1. List All Groups in Active Directory");
             Console.WriteLine("2. Add User to a Group");
             Console.WriteLine("3. Remove User From a Group");
-            Console.WriteLine("4. Check Who is Member in a Group");
+            Console.WriteLine("4. Add User to a Shared Mailbox");
+            Console.WriteLine("5. Remove User From a Shared Mailbox");
+            Console.WriteLine("6. Check Who is Member in a Group");
             Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
 
             string choice = Console.ReadLine().ToLower().Trim();
@@ -296,6 +233,12 @@ class Program
                     ADGroupManager.RemoveUserToGroup(context);
                     break;
                 case "4":
+                    //ADGroupManager.AddUserToSharedMailbox();
+                    break;
+                case "5":
+                    //ADGroupManager.RemoveUserToSharedMailbox();
+                    break;
+                case "6":
                     ADGroupManager.ListGroupMembers(context);
                     break;
                 case "exit":

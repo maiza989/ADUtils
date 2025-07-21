@@ -1,4 +1,5 @@
 ﻿using Pastel;
+using System.Diagnostics;
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Drawing;
@@ -9,7 +10,13 @@ namespace ADUtils
     public class AccountDeactivationManager
     {
         AccountCreationManager ACManager;
-        
+
+        // TODO - Fix accountcreationmanager null reference exception
+        /*public AccountDeactivationManager()
+        {
+            this.ACManager = new AccountCreationManager(Program.configuration);
+        }
+*/
         public void DeactivateUserAccount(PrincipalContext context, string adminUsername, string adminPassword)
         {
             

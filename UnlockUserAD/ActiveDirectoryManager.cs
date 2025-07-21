@@ -142,7 +142,7 @@ namespace ADUtils
                     if (user != null && user.IsAccountLockedOut())                                                                             // If-statement to unlock all users
                     {
                         user.UnlockAccount();
-                        Console.WriteLine($"\tUser account '{user.SamAccountName}' has been unlocked.".Pastel(Color.LimeGreen));
+                        Console.WriteLine($"\t[{DateTime.Now:MM-dd-yyyy HH:mm:ss t}]: User account '{user.SamAccountName}' has been unlocked.".Pastel(Color.LimeGreen));
                         anyUnlocked = true;
                     }// end of if-statement
                 }// end of foreach
@@ -230,7 +230,7 @@ namespace ADUtils
                         {
                             Console.WriteLine($"\t- {user.SamAccountName}".Pastel(Color.Crimson));
                         }*/
-                        Console.WriteLine($"\t- {user.SamAccountName}".Pastel(Color.Crimson));
+                        Console.WriteLine($"\t[{DateTime.Now:MM-dd-yyyy HH:mm:ss t}] - {user.SamAccountName}".Pastel(Color.Crimson));
                         // PrintLockoutEventDetails(user.SamAccountName);
                         isAnyLocked = true;
                     }// end of if-statement

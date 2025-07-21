@@ -29,7 +29,7 @@ namespace ADUtils
         public string _myCompany;
         private readonly string _myExchangeDatabase;
         private readonly string _myExchangeServer;
-        
+
 
         public AccountCreationManager(AuditLogManager auditLogManager, IConfiguration configuration)
         {
@@ -43,6 +43,16 @@ namespace ADUtils
             _myExchangeServer = configuration["AccountCreationSettings:myExchangeServer"];                                      // Update with your exchange server name.
 
         }// end of constructor 
+
+        public AccountCreationManager(IConfiguration configuration)
+        {
+            _myDomain = configuration["AccountCreationSettings:myDomain"];                                                      // Update with your domain
+            _myDomainDotCom = configuration["AccountCreationSettings:myDomainDotCom"];                                          // Update with your second part of your domain (domain(.com))
+            _myParentOU = configuration["AccountCreationSettings:myParentOU"];                                                  // Update with your path of Users OU
+            _myCompany = configuration["AccountCreationSettings:myCompany"];                                                    // Update with your company email domain (*@companyName.com)
+            _myExchangeDatabase = configuration["AccountCreationSettings:myExchangeDatabase"];                                  // Update with your Exchange server database
+            _myExchangeServer = configuration["AccountCreationSettings:myExchangeServer"];                                      // Update with your exchange server name.
+        }
 
         public AccountCreationManager() { }
         public int processSleepTimer = 1000;
@@ -163,26 +173,34 @@ namespace ADUtils
             {
                 case "1":                                               // KY users
                     targetOU = "IT";
+                    _myParentOU = "LloydMc_Lou";
                     break;
                 case "2":
                     targetOU = "Collector";
+                    _myParentOU = "LloydMc_Lou";
                     break;
                 case "3":
                     targetOU = "Admin Staff";
+                    _myParentOU = "LloydMc_Lou";
                     break;
                 case "4":
                     targetOU = "Atty";
+                    _myParentOU = "LloydMc_Lou";
                     break;
                 case "5":
                     targetOU = "Acct";
+                    _myParentOU = "LloydMc_Lou";
                     break;
                 case "6":
                     targetOU = "Compliance";
+                    _myParentOU = "LloydMc_Lou";
                     break;
+
                 case "7":                                               // General MI user
                     targetOU = "";
                     _myParentOU = "Michigan_Users";
                     break;
+
                 case "8":                                               // General GA user
                     targetOU = "";                                      // Empty for default location for GA users
                     _myParentOU = "Cooling_Users";
@@ -192,7 +210,7 @@ namespace ADUtils
                     _myParentOU = "Cooling_Users";
                     break;
                 case "10":                                              // GA Admin Staff user
-                    targetOU = "";                                      // Empty since OU is not set up 
+                    targetOU = "GA_Staff";                                      // Empty since OU is not set up 
                     _myParentOU = "Cooling_Users";
                     break;
                 case "11":                                              // GA Atty user
@@ -317,9 +335,7 @@ namespace ADUtils
                             }
                         }// end of using
 
-                        Console.ForegroundColor = ConsoleColor.DarkCyan;
                         Console.WriteLine($"User Account '{username}' Created Successfully!!!".Pastel(Color.DarkOliveGreen));
-                        Console.ForegroundColor = ConsoleColor.Gray;
 
                         user.Dispose();
 
@@ -437,36 +453,57 @@ namespace ADUtils
             string[] attyGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Attorneys", "LM_Atty" };                                                                                                // 4
             string[] acctGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Accounting", "LM_Accounting", "NoAccountingEmail" };                                                                    // 5
             string[] complianceGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Compliance" };                                                                                                    // 6
+
+
             // MI
-            string[] michiganUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "MI_All_Users_Printers" };                                                              // 7
+            string[] michiganUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                    // 7
+            string[] michiganCollectorUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "Collectors", "LM_Collector",
+                                                "NoOutboundEmail", "Horizon_Collector_RDS_Users", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                              // ##                                   
+            string[] michiganAdminStaffUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "Administrative",
+                                                "Staff", "Horizon_RDS_Desktop_Users", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                                          // ##                                    
+            string[] michiganAttyUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "Attorneys",
+                                                "LM_Atty", "Horizon_Attorney_RDS_Users", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                                       // ##                              
+            string[] michiganAcctUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "Accounting","ACHCC_Full","Horizon_ACC_WycomeMI_Map",
+                                                "Horizon_Accounting_RDS_Users","MI_Accounting_Printers", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                       // ##
+
             // GA
-            string[] georgiaUsersGroups = {"_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice"};                                                                                                  // 8
-            string[] georgiaCollectorUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "Collectors", "LM_Collector", "NoOutboundEmail", "Horizon_Collector_RDS_Users" };       // 9
-            string[] georgiaAdminStaffUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "Administrative", "Staff", "Horizon_RDS_Desktop_Users" };                              // 10
-            string[] georgiaAttyUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "Attorneys", "LM_Atty", "Georgia attorneys", "Horizon_Attorney_RDS_Users" };                 // 11
-            string[] georgiaAcctUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "CW_GAOffice", "LM_Accounting", "NoAccountingEmail", "Horizon_Accounting_RDS_Users" };                      // 12
+            string[] georgiaUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA" };                                                                                                   // 8
+            string[] georgiaCollectorUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "Collectors", "LM_Collector",
+                                                "NoOutboundEmail", "Horizon_Collector_RDS_Users", "BRP_Staff_Horizon_User" };                                                                       // 9
+            string[] georgiaAdminStaffUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "Administrative",
+                                                "Staff", "Horizon_RDS_Desktop_Users", "BRP_Staff_Horizon_User" };                                                                                   // 10
+            string[] georgiaAttyUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "Attorneys",
+                                                "LM_Atty", "Georgia attorneys", "Horizon_Attorney_RDS_Users", "BRP_Staff_Horizon_User" };                                                           // 11
+            string[] georgiaAcctUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "LM_Accounting",
+                                                "NoAccountingEmail", "Horizon_Accounting_RDS_Users", "BRP_Staff_Horizon_User" };                                                                    // 12
+
+
             // Remote
             string[] KYRITGroups = { "_COLLECT", "_COLLECTKY", "_Training", "IT", "LM_IT", "Horizon_IT_User" };
             string[] KYRCollectorGorups = { "_COLLECT", "_COLLECTKY", "_Training", "Collectors", "LM_Collector", "NoOutboundEmail", "Horizon_Collector_RDS_Users" };
-            string[] KYRadminStaffGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Administrative", "Staff", "Horizon_RDS_Desktop_Users"};
+            string[] KYRadminStaffGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Administrative", "Staff", "Horizon_RDS_Desktop_Users" };
             string[] KYRAttyGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Attorneys", "LM_Atty", "Horizon_Attorney_RDS_Users" };
             string[] KYRAcctGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Accounting", "LM_Accounting", "NoAccountingEmail", "Horizon_Accounting_RDS_Users" };
             string[] KYRComplianceGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Compliance", "Horizon_RDS_Desktop_Users" };
 
             // section to determine which group type the user is assigned. 
-            if (targetOu.Contains("IT") || targetOUSelection.Contains("1")) groups = itGroups;
-            else if (targetOu.Contains("Collector") || targetOUSelection.Contains("2")) groups = collectorGroups;
-            else if (targetOu.Contains("Admin Staff") || targetOUSelection.Contains("3")) groups = adminStaffGroups;
-            else if (targetOu.Contains("Atty") || targetOUSelection.Contains("4")) groups = attyGroups;
-            else if (targetOu.Contains("Acct") || targetOUSelection.Contains("5")) groups = acctGroups;
-            else if (targetOu.Contains("Compliance") || targetOUSelection.Contains("6")) groups = complianceGroups;
-            else if (targetOu.Contains("Michigan_Users") || _myParentOU.Contains("Michigan_Users") && targetOUSelection.Contains("7")) groups = michiganUsersGroups;
-            else if (targetOu.Contains("Cooling_Users") || _myParentOU.Contains("Cooling_Users") && targetOUSelection.Contains("8")) groups = georgiaUsersGroups;
-            else if (targetOu.Contains("Cooling_User_Collector") || _myParentOU.Contains("Cooling_Users") && targetOUSelection.Contains("9")) groups = georgiaCollectorUsersGroups;
-            else if (targetOu.Contains("Cooling_User_Staff") || _myParentOU.Contains("Cooling_Users") && targetOUSelection.Contains("10")) groups = georgiaAdminStaffUsersGroups;
-            else if (targetOu.Contains("Cooling_User_Atty") || _myParentOU.Contains("Cooling_Users") && targetOUSelection.Contains("11")) groups = georgiaAttyUsersGroups;
-            else if (targetOu.Contains("Cooling_User_Acct") || _myParentOU.Contains("Cooling_Users") && targetOUSelection.Contains("12")) groups = georgiaAcctUsersGroups;
+            // KY
+            if (targetOu.Contains("IT") || targetOUSelection.Equals("1")) groups = itGroups;
+            else if (targetOu.Contains("Collector") || targetOUSelection.Equals("2")) groups = collectorGroups;
+            else if (targetOu.Contains("Admin Staff") || targetOUSelection.Equals("3")) groups = adminStaffGroups;
+            else if (targetOu.Contains("Atty") || targetOUSelection.Equals("4")) groups = attyGroups;
+            else if (targetOu.Contains("Acct") || targetOUSelection.Equals("5")) groups = acctGroups;
+            else if (targetOu.Contains("Compliance") || targetOUSelection.Equals("6")) groups = complianceGroups;
+            // MI
+            else if (targetOu.Contains("Michigan_Users") || _myParentOU.Equals("Michigan_Users") && targetOUSelection.Equals("7")) groups = michiganUsersGroups;
+            // GA
+            else if (targetOu.Contains("Cooling_Users") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("8")) groups = georgiaUsersGroups;
+            else if (targetOu.Contains("Call_Center") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("9")) groups = georgiaCollectorUsersGroups;
+            else if (targetOu.Contains("GA_Staff") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("10")) groups = georgiaAdminStaffUsersGroups;
+            else if (targetOu.Contains("GA_Litigation") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("11")) groups = georgiaAttyUsersGroups;
+            else if (targetOu.Contains("Accounting") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("12")) groups = georgiaAcctUsersGroups;
 
+            // List<string> groups = GroupAssignmentHelper.GetGroups(office, targetOu);
 
             if (groups != null)
             {
@@ -484,10 +521,7 @@ namespace ADUtils
                                 group.Save();
                             }// end of if statement
                         }// end of foreach
-
-                        Console.ForegroundColor = ConsoleColor.DarkCyan;
-                        Console.WriteLine($"User '{username}' added to roups: {string.Join(", ", groups)}!!!".Pastel(Color.DarkOliveGreen));
-                        Console.ForegroundColor = ConsoleColor.Gray;
+                        Console.WriteLine($"User '{username}' added to groups: {string.Join(", ", groups)}!!!".Pastel(Color.DarkOliveGreen));
                     }// end of if-statement
                     else
                     {
@@ -500,6 +534,8 @@ namespace ADUtils
                 Console.WriteLine($"No group assignments found for the target OU '{targetOu}'");
             }// end of else-statement
         }// end of addUserToGroup
+
+       
 
         /// <summary>
         /// Create a CLS folder in desired location
@@ -600,6 +636,8 @@ namespace ADUtils
                 ps.AddParameter("Authentication", "Kerberos");
                 ps.AddParameter("Credential", new PSCredential(adminUsername, securePassword));
 
+              //  ps.AddParameter("Credential", new PSCredential(adminUsername, securePassword));
+
                 // Invoke New-PSSession to establish a session
                 Collection<PSObject> result = ps.Invoke();
                 if (HandlePowershellErrors(ps, "creating PSSession")) return;
@@ -621,6 +659,8 @@ namespace ADUtils
                 ps.AddCommand("Enable-Mailbox");
                 ps.AddParameter("Identity", username);
                 ps.AddParameter("Database", _myExchangeDatabase);
+                // TODO - Fix error about there is no avaliable globle catalog when enabling mailbox. 
+               
 
                 // Invoke Enable-Mailbox
                 ps.Invoke();
