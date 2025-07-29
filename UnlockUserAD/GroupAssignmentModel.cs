@@ -144,8 +144,7 @@ namespace ADUtils
         Region = "KY-Remote", Role = "Atty",
         Groups = new List<string> { "_COLLECT", "_COLLECTKY", "_Training", "Attorneys", "LM_Atty", "Horizon_Attorney_RDS_Users" }
     },
-    new GroupAssignmentModel
-
+};
         public static List<string> GetGroups(string region, string role)
         {
             return groupAssignments

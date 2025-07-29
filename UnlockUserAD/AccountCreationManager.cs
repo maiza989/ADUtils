@@ -443,6 +443,7 @@ namespace ADUtils
         /// <param name="targetOu">The distinguished name of the target OU.</param>
         private void AddNewUserToGroups(string username, string targetOu, string adminUsername, string adminPassword)
         {
+            // TODO - Fix the group assignment for new hire to be dynamic
             // Section to add more group types
             Thread.Sleep(processSleepTimer);
             string[] groups = null;                                                                                                                                                                // Change the group var name and value to match your needs
@@ -503,6 +504,7 @@ namespace ADUtils
             else if (targetOu.Contains("GA_Litigation") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("11")) groups = georgiaAttyUsersGroups;
             else if (targetOu.Contains("Accounting") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("12")) groups = georgiaAcctUsersGroups;
 
+            //TODO - update the group assignment for new hire to be dynamic. 
             // List<string> groups = GroupAssignmentHelper.GetGroups(office, targetOu);
 
             if (groups != null)

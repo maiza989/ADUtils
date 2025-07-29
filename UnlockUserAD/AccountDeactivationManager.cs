@@ -9,17 +9,14 @@ namespace ADUtils
 {
     public class AccountDeactivationManager
     {
-        AccountCreationManager ACManager;
+        
 
-        // TODO - Fix accountcreationmanager null reference exception
-        /*public AccountDeactivationManager()
-        {
-            this.ACManager = new AccountCreationManager(Program.configuration);
-        }
-*/
+        // TODO - DONE Fix accountcreationmanager null reference exception -
+
         public void DeactivateUserAccount(PrincipalContext context, string adminUsername, string adminPassword)
         {
-            
+            AccountCreationManager ACManager = new AccountCreationManager(Program.configuration);
+
             string ouPath = $"LDAP://OU=Ex Employee,OU={ACManager._myCompany}_Lou,DC={ACManager._myDomain},DC={ACManager._myDomain}";
             DateTime deletionDate = DateTime.Now.AddDays(31);                                                                           // Calculate Today's date + 31 days
             string deletionDateString = deletionDate.ToString("MM-dd-yyyy");                                                            // Format the date
