@@ -139,6 +139,10 @@ namespace ADUtils
                 foreach (var result in searcher.FindAll())
                 {
                     UserPrincipal user = result as UserPrincipal;
+                    if(!user.IsAccountLockedOut())
+                    {
+                        continue;
+                    }
                     if (user != null && user.IsAccountLockedOut())                                                                             // If-statement to unlock all users
                     {
                         user.UnlockAccount();
@@ -208,30 +212,24 @@ namespace ADUtils
                 foreach (var result in searcher.FindAll())                                                                                      // Look through what is in the user search object
                 {
                     UserPrincipal user = result as UserPrincipal;
+                    if(!user.IsAccountLockedOut() || user == null)
+                    {
+                        continue;
+                    }
                     if (user != null && user.IsAccountLockedOut())                                                                              // Print out all locked users
                     {
                         DirectoryEntry directoryEntry = (user.GetUnderlyingObject() as DirectoryEntry);
+                        DateTime? lockoutTime = null;
                         // TODO - Fix grabbing time lock out for users.
-                        /*if (directoryEntry.Properties.Contains("lockoutTime") && directoryEntry.Properties["lockoutTime"].Value != null  )
+                        if (directoryEntry.Properties.Contains("lockoutTime"))
                         {
-                          
-                            long lockoutTimeValue = (long)directoryEntry.Properties["lockoutTime"].Value;
-                            try
-                            {                       
-                                    DateTime lockoutTime = DateTime.FromFileTime(lockoutTimeValue);
-                                    Console.WriteLine($"\t- {user.SamAccountName} | {lockoutTime}".Pastel(Color.Crimson));
-                            }
-                            catch(InvalidCastException ex)
+                            long lockoutTicks = (long)directoryEntry.Properties["lockoutTime"].Value;
+                            if(lockoutTicks > 0)
                             {
-                                Console.WriteLine($"Error cassting lockoutTime\tError: {ex.Message}");
+                                lockoutTime = DateTime.FromFileTimeUtc(lockoutTicks).ToLocalTime();
                             }
-                        }// end of if-statement
-                        else
-                        {
-                            Console.WriteLine($"\t- {user.SamAccountName}".Pastel(Color.Crimson));
-                        }*/
-                        Console.WriteLine($"\t[{DateTime.Now:MM-dd-yyyy HH:mm:ss t}] - {user.SamAccountName}".Pastel(Color.Crimson));
-                        // PrintLockoutEventDetails(user.SamAccountName);
+                        Console.WriteLine($"\t[{lockoutTime?.ToString("MM-dd-yyyy HH:mm:ss")}] - {user.SamAccountName}".Pastel(Color.Crimson));
+                        }
                         isAnyLocked = true;
                     }// end of if-statement
                 }// end of foreach

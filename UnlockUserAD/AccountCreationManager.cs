@@ -30,6 +30,7 @@ namespace ADUtils
         private readonly string _myExchangeDatabase;
         private readonly string _myExchangeServer;
 
+        
 
         public AccountCreationManager(AuditLogManager auditLogManager, IConfiguration configuration)
         {
@@ -75,18 +76,348 @@ namespace ADUtils
         private string userProfile;
         private string clsUserFolder;
         private string ouPath;
+        
 
         private List<string> emailActionLog = new List<string>();                                                                // String list that hold email body
+        /*
+                /// <summary>
+                /// Create a user in Active Directory based on the information provided by the user.
+                /// </summary>
+                /// <param name="adminUsername"></param>
+                /// <param name="adminPassword"></param>
+                public void CreateUserAccount(string adminUsername, string adminPassword)
+                {
+                    bool manualSteps = false;
+                    // Prompt for user details
+                    Console.Write("Enter new user's first name: ");
+                    firstName = Console.ReadLine();
 
-        /// <summary>
-        /// Create a user in Active Directory based on the information provided by the user.
-        /// </summary>
-        /// <param name="adminUsername"></param>
-        /// <param name="adminPassword"></param>
+                    Console.Write("Enter new user's last name: ");
+                    lastName = Console.ReadLine();
+
+                    Console.Write("Enter user's job title: ");
+                    jobTitle = Console.ReadLine();
+
+                    Console.Write("Enter user's department: ");
+                    departmentEntry = Console.ReadLine();
+
+                    Console.Write("Enter user description: ");
+                    description = Console.ReadLine();
+
+                    Console.Write("Enter user office (KY, MI, GA, or Remote): ");
+                    office = Console.ReadLine().Trim();
+
+                    Console.Write("Enter user manager (SAM Account Name): ");
+                    manager = Console.ReadLine();
+
+                    //TODO - redo the selection of user creation This need to be do to create user with Horizon access if user is GA, MI or KY Remote
+                    int choice;
+                    bool validInput = false; 
+                    switch (office.Trim().ToUpper())
+                    {
+                        case "KY":
+                            do
+                            {
+                                Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
+                                                  $"\n 1- IT\n 2- Collector\n 3- Admin Staff\n 4- Atty\n 5- Acct\n 6- Compliance");
+                                Console.Write("Enter your choice:");
+                                validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice >= 1 && choice <= 6;
+                                if (!validInput) Console.WriteLine("Invalid input, please enter a number between 1 and 6.");
+                            } while(!validInput);
+                            targetOUSelection = choice.ToString();
+                            break;
+                        case "MI":
+                            do
+                            {
+                                Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
+                                                  $"\n 7- Michigan Users\n 8- Michigan Collector\n 9- Michigan Admin staff \n 10- Michigan Attorney\n 11- Michigan Accounting");
+                                Console.Write("Enter your choice:");
+                                validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice >= 7 && choice <=11;
+                                if (!validInput) Console.WriteLine("Invalid input, please enter a number beteen 7 and 11.");
+                            } while (!validInput);
+                            targetOUSelection = choice.ToString();   
+                            break;
+                        case "GA":
+                            do
+                            {
+                                Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
+                                                  $"\n 12- Default Georgia Users\n 13- Georgia Collector\n 14- Georgia Admin Staff\n 15- Georgia Atty\n 16- Georgia Accounting");
+                                Console.Write("Enter your choice: ");
+                                validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice >= 12 && choice <= 16;
+                                if (!validInput) Console.WriteLine("Invalid input, please enter a number between 12 and 16.");
+                            } while (!validInput);
+                            targetOUSelection = choice.ToString();
+                            break;
+                        case "REMOTE":
+                            do
+                            {
+                                Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
+                                                  $"\n( 1- IT\n 2- Collector\n 3- Admin Staff\n 4- Atty\n 5- Acct\n 6- Compliance\n " +
+                                                  $"7- Michigan Users\n 8- GA Users)\n");
+                                Console.Write("Enter your choice: ");
+                                validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice >= 1 && choice <= 8;
+                                if (!validInput) Console.WriteLine("Invalid input, please enter a number between 1 and 8.");
+                            } while (!validInput);
+                            targetOUSelection = choice.ToString();
+                            break;
+                        default:
+
+                            Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
+                                              $"\n( 1- IT\n 2- Collector\n 3- Admin Staff\n 4- Atty\n 5- Acct\n 6- Compliance\n " +
+                                              $"7- Michigan Users\n " +
+                                              $"8- Georgia Users)\n");
+                            Console.Write("Enter your choice:");
+                            targetOUSelection = Console.ReadLine().Trim();
+                            break;
+                    }// end of switch
+
+                    switch (targetOUSelection)
+                    {
+                                                                                // KY users
+                        case "1":                                               // KY IT user   
+                            targetOU = "IT";                
+                            _myParentOU = "LloydMc_Lou";
+                            break;
+                        case "2":                                               // KY Collector user    
+                            targetOU = "Collector";                             
+                            _myParentOU = "LloydMc_Lou";
+                            break;
+                        case "3":                                               // KY Admin Staff user  
+                            targetOU = "Admin Staff";       
+                            _myParentOU = "LloydMc_Lou";
+                            break;
+                        case "4":                                               // KY Atty user   
+                            targetOU = "Atty";
+                            _myParentOU = "LloydMc_Lou";
+                            break;
+                        case "5":                                               // KY Accounting user       
+                            targetOU = "Acct";
+                            _myParentOU = "LloydMc_Lou";
+                            break;
+                        case "6":                                               // KY Compliance user   
+                            targetOU = "Compliance";
+                            _myParentOU = "LloydMc_Lou";
+                            break;
+
+                        case "7":                                               // General MI user
+                            targetOU = "";
+                            _myParentOU = "Michigan_Users";
+                            break;
+                        case "8":                                               // MI Collector User 
+                            targetOU = "";
+                            _myParentOU = "Michigan_Users";
+                            break;
+                        case "9":                                               // MI Admin Staff user  
+                            targetOU = "";
+                            _myParentOU = "Michigan_Users";
+                            break;
+                        case "10":                                              // MI Atty user 
+                            targetOU = "";
+                            _myParentOU = "Michigan_Users";
+                            break;
+                        case "11":                                              // MI Accounting user   
+                            targetOU = "";
+                            _myParentOU = "Michigan_Users";
+                            break;
+
+
+                        case "12":                                               // General GA user
+                            targetOU = "";                                      // Empty for default location for GA users
+                            _myParentOU = "Cooling_Users";
+                            break;
+                        case "13":                                               // GA Collector User
+                            targetOU = "Call_Center";
+                            _myParentOU = "Cooling_Users";
+                            break;
+                        case "14":                                              // GA Admin Staff user
+                            targetOU = "GA_Staff";                                      // Empty since OU is not set up 
+                            _myParentOU = "Cooling_Users";
+                            break;
+                        case "15":                                              // GA Atty user
+                            targetOU = "";                                      // empty since OU is not set up
+                            _myParentOU = "Cooling_Users";
+                            break;
+                        case "16":                                              // GA Accounting user
+                            targetOU = "Accounting";
+                            _myParentOU = "Cooling_Users";
+                            break;
+                        default:
+                            targetOU = "Admin Staff";
+                            break;
+                    }// end of switch-case
+
+                    // Generate additional details
+                    firstInitial = Regex.Match(firstName, ".{1,1}").Value;
+                    lastInitial = Regex.Match(lastName, ".{1,1}").Value;
+                    username = $"{firstInitial.ToLower()}{lastName.ToLower()}";
+                    email = $"{username}@{_myCompany}.com";
+                    password = $"New_User_{_myCompany}_{firstInitial.ToUpper()}{lastInitial.ToUpper()}!";
+                    userProfile = $@"\\lmnas-02\users\{username}";
+                    clsUserFolder = $@"\\lmcls\sys\users\{firstInitial.ToLower()}{lastName.ToLower()}";
+
+                    Console.WriteLine($"\n-----------------------------------------------------------------------------------" +
+                                     $"\n{"First Name:",-20} {firstName}\n" +
+                                     $"{"Last Name:",-20} {lastName}\n" +
+                                     $"{"Display Name:",-20} {firstName} {lastName}\n" +
+                                     $"{"Username:", -20} {username}\n" +
+                                     $"{"Email Address:", -20} {email}\n" + 
+                                     $"{"Temp Password:", -20} {password} \n" +
+                                     $"{"Department:", -20} {departmentEntry} \n" +
+                                     $"{"Title:", -20} {jobTitle} \n" +
+                                     $"{"Description:", -20} {description} \n" +
+                                     $"{"Physical Office:", -20} {office} \n" +
+                                     $"{"User Assigned OU:", -20} {targetOU} \n" +
+                                     $"{"User Parent OU", -20} {_myParentOU} \n" + 
+                                     $"{"Script Path:", -20} logon.bat \n" +
+                                     $"{"Home Drive:", -20} P: \n" +
+                                     $"{"User Home Directory:", -20} {userProfile} \n" +
+                                     $"{"CLS Folder Location:", -20} {clsUserFolder}\n" +
+                                     $"-----------------------------------------------------------------------------------\n");
+
+                    bool isExit = false;
+                    while (!isExit)
+                    {
+                        Console.Write($"\nPlease verify all new user information are correct !!!{"(Y/N)".Pastel(Color.MediumPurple)}:");
+                        string confirmation = Console.ReadLine().ToUpper().Trim();
+
+                        if (confirmation == "Y")
+                        {
+                            isExit = true;
+                            Console.WriteLine("User information has been verified. \nCreating user...\n");
+                        }// end of if-statement
+                        else
+                        {
+                            Console.WriteLine("\nReturning to menu....");
+                            return;
+                        }// end of else-statement
+                    }// end of while
+
+                    try
+                    {
+                        if (targetOU == "")
+                        {
+                           ouPath = $"LDAP://OU={_myParentOU},DC={_myDomain},DC={_myDomainDotCom}";
+
+                        }// end of if statement
+                        else
+                        {
+                           ouPath = $"LDAP://OU={targetOU},OU={_myParentOU},DC={_myDomain},DC={_myDomainDotCom}";
+                        }// end of else statement
+                        // TODO - DONE fix the traget and parent OU for GA and MI user. Currently the parent OU only works for KY users.
+
+                        using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
+                        {  
+                            using (UserPrincipal user = new UserPrincipal(context))                                                                     // Creating new User
+                            {
+                                user.Name = $"{firstName} {lastName}";
+                                user.SamAccountName = username;
+                                user.UserPrincipalName = $"{username}@{_myCompany}.com";
+                                user.SetPassword(password);
+                                user.GivenName = firstName;
+                                user.Surname = lastName;
+                                user.EmailAddress = email;
+                                user.DisplayName = $"{firstName} {lastName}";
+                                user.ScriptPath = "logon.bat";
+                                user.Description = description;
+                                user.HomeDrive = "P:";
+                                user.HomeDirectory = userProfile;
+                                user.Enabled = true;
+                                user.UserCannotChangePassword = false;
+                                user.PasswordNeverExpires = false;
+                                user.Save();
+
+                                using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())                                           // Move user to the specified OU
+                                {
+                                    DirectoryEntry startOU = new DirectoryEntry(userEntry.Path);
+                                    DirectoryEntry endOU = new DirectoryEntry(ouPath, adminUsername, adminPassword);
+                                    userEntry.Properties["title"].Value = jobTitle;
+                                    userEntry.Properties["department"].Value = departmentEntry;
+                                    userEntry.Properties["physicalDeliveryOfficeName"].Value = office;
+
+                                    try
+                                    {
+                                        CheckManagerDN(); 
+                                        userEntry.Properties["manager"].Value = managerDN;
+                                    }
+                                    catch(Exception ex)
+                                    {
+                                        Console.WriteLine($"An error occurred while filling manager field for the user: {ex.Message}");
+                                    }
+                                    userEntry.CommitChanges();
+                                    try
+                                    {
+                                        startOU.MoveTo(endOU);
+
+                                    }
+                                    catch (COMException ex)
+                                    {
+                                        Console.WriteLine($"An error occurred while moving the user to the traget OU: {ex.Message}");
+                                    }
+                                }// end of using
+
+                                Console.WriteLine($"User Account '{username}' Created Successfully!!!".Pastel(Color.DarkOliveGreen));
+
+                                user.Dispose();
+
+
+                            }// end of UserPrincipal using
+                        }// end of PrincipalContect using
+
+                        IsUserCreated(username);                                                                                                        // Verify account is created in AD
+                        AddNewUserToGroups(username, region,role, adminUsername, adminPassword);                                                           // Add using to basic groups based on select organizational unit (OU)
+                        CreateExchangeMailbox(adminUsername, adminPassword);                                                                            // Create local Exchange mailbox
+                        CreateCLSFolder(clsUserFolder);                                                                                                 // Optional: Create CLS folder for new user
+                        LaunchVLMMgr();                                                                                                                 // Optional: Open VLM to add CLS license to the user
+                        LaunchPhoneSystemSite();                                                                                                        // Optional: Open RingCentral site to add EXT
+                        LaunchO365Site();                                                                                                               // Optional: Open O365 site to add licensees to the user.
+
+                        string logEntry = ($"New Account has been created \"{firstName} {lastName} | {username}\" in Active Directory\n " +
+                                           $"\nUser added to {targetOU} OU and assgined basic groups \n" +
+                                           $"\nNew Exchange MailBox has been created for \"{firstName} {lastName} | {username}\"\n" +
+                                           $"\nNew CLS folder has been created for \"{firstName} {lastName} | {username}\"\n " +
+                                           $"\nNew CLS license needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
+                                           $"\nNew vMedia license needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
+                                           $"\nNew EXT needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
+                                           $"\nNew O365 license needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
+                                           $"");
+                        auditLogManager.Log(logEntry);
+                        emailActionLog.Add(logEntry);
+                        // TODO - Fix duplicate email log entries when creating multiple users in a row.    
+                    }// end of try
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error creating user account: {ex.Message}");
+                    }// end of catch
+
+                    if (emailActionLog.Count > 0)
+                    {
+                        string emailBody = string.Join("\n", emailActionLog);
+                        emailNotification.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
+                    }// end of if statement
+                    do
+                    {
+                        Console.Write($"Have you completed the manual steps for CLS, BRP, Phone, Office 365?{"(Y/N)".Pastel(Color.MediumPurple)}\nEnter your choice: ");
+                        string result =  Console.ReadLine().Trim().ToUpper();
+                        if(result == "Y")
+                        {
+                            Console.WriteLine("Manual Steps complete");
+                            manualSteps = true;
+                        }else if(result == "N")
+                        {
+                            Console.WriteLine("Manual Steps are reqired!!");
+                        }
+                    } while(!manualSteps);
+
+                }// end of CreateUserAccount*/
+
+
         public void CreateUserAccount(string adminUsername, string adminPassword)
         {
             bool manualSteps = false;
+
+            // -------------------------
             // Prompt for user details
+            // -------------------------
             Console.Write("Enter new user's first name: ");
             firstName = Console.ReadLine();
 
@@ -103,130 +434,83 @@ namespace ADUtils
             description = Console.ReadLine();
 
             Console.Write("Enter user office (KY, MI, GA, or Remote): ");
-            office = Console.ReadLine().Trim();
+            office = Console.ReadLine().Trim().ToUpper();
 
             Console.Write("Enter user manager (SAM Account Name): ");
             manager = Console.ReadLine();
 
-            //TODO - redo the selection of user creation This need to be do to create user with Horizon access if user is GA, MI or KY Remote
+            // -------------------------
+            // Define OU options dynamically
+            // -------------------------
+            var TargetOUs = new List<TargetOU>
+    {
+        // KY
+        new TargetOU("KY", "IT", "LloydMc_Lou"),
+        new TargetOU("KY", "Collector", "LloydMc_Lou"),
+        new TargetOU("KY", "Admin Staff", "LloydMc_Lou"),
+        new TargetOU("KY", "Atty", "LloydMc_Lou"),
+        new TargetOU("KY", "Acct", "LloydMc_Lou"),
+        new TargetOU("KY", "Compliance", "LloydMc_Lou"),
+
+        // MI
+        new TargetOU("MI", "", "Michigan_Users", "Michigan Users"),
+        new TargetOU("MI", "", "Michigan_Users", "Michigan Collector"),
+        new TargetOU("MI", "", "Michigan_Users", "Michigan Admin Staff"),
+        new TargetOU("MI", "", "Michigan_Users", "Michigan Atty"),
+        new TargetOU("MI", "", "Michigan_Users", "Michigan Accounting"),
+
+        // GA
+        new TargetOU("GA", "", "Cooling_Users", "Default Georgia Users"),
+        new TargetOU("GA", "Call_Center", "Cooling_Users", "Georgia Collector"),
+        new TargetOU("GA", "GA_Staff", "Cooling_Users", "Georgia Admin Staff"),
+        new TargetOU("GA", "", "Cooling_Users", "Georgia Atty"),
+        new TargetOU("GA", "Accounting", "Cooling_Users", "Georgia Accounting"),
+
+        // Remote
+        new TargetOU("REMOTE", "IT", "LloydMc_Lou"),
+        new TargetOU("REMOTE", "Collector", "LloydMc_Lou"),
+        new TargetOU("REMOTE", "Admin Staff", "LloydMc_Lou"),
+        new TargetOU("REMOTE", "Atty", "LloydMc_Lou"),
+        new TargetOU("REMOTE", "Acct", "LloydMc_Lou"),
+        new TargetOU("REMOTE", "Compliance", "LloydMc_Lou"),
+        new TargetOU("REMOTE", "", "Michigan_Users", "Michigan Users"),
+        new TargetOU("REMOTE", "", "Cooling_Users", "GA Users")
+    };
+
+            // Filter options by office
+            var filteredOptions = TargetOUs.Where(o => o.Office == office).ToList();
+            if (!filteredOptions.Any())
+            {
+                Console.WriteLine("Invalid office entered. Defaulting to KY IT.");
+                filteredOptions = TargetOUs.Where(o => o.Office == "KY").Take(1).ToList();
+            }
+
+            // -------------------------
+            // Display options and get selection
+            // -------------------------
+            Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}:");
+            for (int i = 0; i < filteredOptions.Count; i++)
+                Console.WriteLine($"{i + 1}- {filteredOptions[i].DisplayName}");
+
             int choice;
-            bool validInput = false; 
-            switch (office.Trim().ToUpper())
+            bool validInput;
+            do
             {
-                case "KY":
-                    do
-                    {
-                        Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
-                                          $"\n 1- IT\n 2- Collector\n 3- Admin Staff\n 4- Atty\n 5- Acct\n 6- Compliance");
-                        Console.Write("Enter your choice:");
-                        validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice >= 1 && choice <= 6;
-                        if (!validInput) Console.WriteLine("Invalid input, please enter a number between 1 and 6.");
-                    } while(!validInput);
-                    targetOUSelection = choice.ToString();
-                    break;
-                case "MI":
-                    do
-                    {
-                        Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
-                                          $"\n 7- Michigan Users");
-                        Console.Write("Enter your choice:");
-                        validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice == 7;
-                        if (!validInput) Console.WriteLine("Invalid input, please enter 7.");
-                    } while (!validInput);
-                    targetOUSelection = choice.ToString();   
-                    break;
-                case "GA":
-                    do
-                    {
-                        Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
-                                          $"\n 8- Default Georgia Users\n 9- Georgia Collector\n 10- Georgia Admin Staff\n 11- Georgia Atty\n 12- Georgia Accounting");
-                        Console.Write("Enter your choice: ");
-                        validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice >= 8 && choice <= 12;
-                        if (!validInput) Console.WriteLine("Invalid input, please enter a number between 8 and 12.");
-                    } while (!validInput);
-                    targetOUSelection = choice.ToString();
-                    break;
-                case "REMOTE":
-                    do
-                    {
-                        Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
-                                          $"\n( 1- IT\n 2- Collector\n 3- Admin Staff\n 4- Atty\n 5- Acct\n 6- Compliance\n " +
-                                          $"7- Michigan Users\n 8- GA Users)\n");
-                        Console.Write("Enter your choice: ");
-                        validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice >= 1 && choice <= 8;
-                        if (!validInput) Console.WriteLine("Invalid input, please enter a number between 1 and 8.");
-                    } while (!validInput);
-                    targetOUSelection = choice.ToString();
-                    break;
-                default:
-                    
-                    Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}" +
-                                      $"\n( 1- IT\n 2- Collector\n 3- Admin Staff\n 4- Atty\n 5- Acct\n 6- Compliance\n " +
-                                      $"7- Michigan Users\n " +
-                                      $"8- Georgia Users)\n");
-                    Console.Write("Enter your choice:");
-                    targetOUSelection = Console.ReadLine().Trim();
-                    break;
-            }// end of switch
-           
-            switch (targetOUSelection)
-            {
-                case "1":                                               // KY users
-                    targetOU = "IT";
-                    _myParentOU = "LloydMc_Lou";
-                    break;
-                case "2":
-                    targetOU = "Collector";
-                    _myParentOU = "LloydMc_Lou";
-                    break;
-                case "3":
-                    targetOU = "Admin Staff";
-                    _myParentOU = "LloydMc_Lou";
-                    break;
-                case "4":
-                    targetOU = "Atty";
-                    _myParentOU = "LloydMc_Lou";
-                    break;
-                case "5":
-                    targetOU = "Acct";
-                    _myParentOU = "LloydMc_Lou";
-                    break;
-                case "6":
-                    targetOU = "Compliance";
-                    _myParentOU = "LloydMc_Lou";
-                    break;
+                Console.Write("Enter your choice: ");
+                validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice >= 1 && choice <= filteredOptions.Count;
+                if (!validInput)
+                    Console.WriteLine($"Invalid input, please enter a number between 1 and {filteredOptions.Count}.");
+            } while (!validInput);
 
-                case "7":                                               // General MI user
-                    targetOU = "";
-                    _myParentOU = "Michigan_Users";
-                    break;
+            var selectedOU = filteredOptions[choice - 1];
+            targetOU = selectedOU.Role;
+            _myParentOU = selectedOU.ParentOU;
+            string region = selectedOU.Office; // for AddNewUserToGroups
+            string role = selectedOU.Role;      // for AddNewUserToGroups
 
-                case "8":                                               // General GA user
-                    targetOU = "";                                      // Empty for default location for GA users
-                    _myParentOU = "Cooling_Users";
-                    break;
-                case "9":                                               // GA Collector User
-                    targetOU = "Call_Center";
-                    _myParentOU = "Cooling_Users";
-                    break;
-                case "10":                                              // GA Admin Staff user
-                    targetOU = "GA_Staff";                                      // Empty since OU is not set up 
-                    _myParentOU = "Cooling_Users";
-                    break;
-                case "11":                                              // GA Atty user
-                    targetOU = "";                                      // empty since OU is not set up
-                    _myParentOU = "Cooling_Users";
-                    break;
-                case "12":                                              // GA Accounting user
-                    targetOU = "Accounting";
-                    _myParentOU = "Cooling_Users";
-                    break;
-                default:
-                    targetOU = "Admin Staff";
-                    break;
-            }// end of switch-case
-
-            // Generate additional details
+            // -------------------------
+            // Generate username, email, etc.
+            // -------------------------
             firstInitial = Regex.Match(firstName, ".{1,1}").Value;
             lastInitial = Regex.Match(lastName, ".{1,1}").Value;
             username = $"{firstInitial.ToLower()}{lastName.ToLower()}";
@@ -235,59 +519,59 @@ namespace ADUtils
             userProfile = $@"\\lmnas-02\users\{username}";
             clsUserFolder = $@"\\lmcls\sys\users\{firstInitial.ToLower()}{lastName.ToLower()}";
 
+            // -------------------------
+            // Display summary
+            // -------------------------
             Console.WriteLine($"\n-----------------------------------------------------------------------------------" +
-                             $"\n{"First Name:",-20} {firstName}\n" +
-                             $"{"Last Name:",-20} {lastName}\n" +
-                             $"{"Display Name:",-20} {firstName} {lastName}\n" +
-                             $"{"Username:", -20} {username}\n" +
-                             $"{"Email Address:", -20} {email}\n" + 
-                             $"{"Temp Password:", -20} {password} \n" +
-                             $"{"Department:", -20} {departmentEntry} \n" +
-                             $"{"Title:", -20} {jobTitle} \n" +
-                             $"{"Description:", -20} {description} \n" +
-                             $"{"Physical Office:", -20} {office} \n" +
-                             $"{"User Assigned OU:", -20} {targetOU} \n" +
-                             $"{"User Parent OU", -20} {_myParentOU} \n" + 
-                             $"{"Script Path:", -20} logon.bat \n" +
-                             $"{"Home Drive:", -20} P: \n" +
-                             $"{"User Home Directory:", -20} {userProfile} \n" +
-                             $"{"CLS Folder Location:", -20} {clsUserFolder}\n" +
-                             $"-----------------------------------------------------------------------------------\n");
+                              $"\n{"First Name:",-20} {firstName}\n" +
+                              $"{"Last Name:",-20} {lastName}\n" +
+                              $"{"Display Name:",-20} {firstName} {lastName}\n" +
+                              $"{"Username:",-20} {username}\n" +
+                              $"{"Email Address:",-20} {email}\n" +
+                              $"{"Temp Password:",-20} {password} \n" +
+                              $"{"Department:",-20} {departmentEntry} \n" +
+                              $"{"Title:",-20} {jobTitle} \n" +
+                              $"{"Description:",-20} {description} \n" +
+                              $"{"Physical Office:",-20} {office} \n" +
+                              $"{"User Assigned OU:",-20} {targetOU} \n" +
+                              $"{"User Parent OU",-20} {_myParentOU} \n" +
+                              $"{"Script Path:",-20} logon.bat \n" +
+                              $"{"Home Drive:",-20} P: \n" +
+                              $"{"User Home Directory:",-20} {userProfile} \n" +
+                              $"{"CLS Folder Location:",-20} {clsUserFolder}\n" +
+                              $"-----------------------------------------------------------------------------------\n");
 
-            bool isExit = false;
-            while (!isExit)
+            // -------------------------
+            // Confirm info
+            // -------------------------
+            while (true)
             {
-                Console.Write($"\nPlease verify all new user information are correct !!!{"(Y/N)".Pastel(Color.MediumPurple)}:");
+                Console.Write($"\nPlease verify all new user information are correct !!!{"(Y/N)".Pastel(Color.MediumPurple)}: ");
                 string confirmation = Console.ReadLine().ToUpper().Trim();
-
                 if (confirmation == "Y")
                 {
-                    isExit = true;
                     Console.WriteLine("User information has been verified. \nCreating user...\n");
-                }// end of if-statement
+                    break;
+                }
                 else
                 {
                     Console.WriteLine("\nReturning to menu....");
                     return;
-                }// end of else-statement
-            }// end of while
-            
+                }
+            }
+
+            // -------------------------
+            // Create user in AD
+            // -------------------------
             try
             {
-                if (targetOU == "")
-                {
-                   ouPath = $"LDAP://OU={_myParentOU},DC={_myDomain},DC={_myDomainDotCom}";
-                
-                }// end of if statement
-                else
-                {
-                   ouPath = $"LDAP://OU={targetOU},OU={_myParentOU},DC={_myDomain},DC={_myDomainDotCom}";
-                }// end of else statement
-                // TODO - DONE fix the traget and parent OU for GA and MI user. Currently the parent OU only works for KY users.
-                   
+                ouPath = string.IsNullOrEmpty(targetOU)
+                    ? $"LDAP://OU={_myParentOU},DC={_myDomain},DC={_myDomainDotCom}"
+                    : $"LDAP://OU={targetOU},OU={_myParentOU},DC={_myDomain},DC={_myDomainDotCom}";
+
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
-                {  
-                    using (UserPrincipal user = new UserPrincipal(context))                                                                     // Creating new User
+                {
+                    using (UserPrincipal user = new UserPrincipal(context))
                     {
                         user.Name = $"{firstName} {lastName}";
                         user.SamAccountName = username;
@@ -306,34 +590,22 @@ namespace ADUtils
                         user.PasswordNeverExpires = false;
                         user.Save();
 
-                        using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())                                           // Move user to the specified OU
+                        using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())
                         {
-                            DirectoryEntry startOU = new DirectoryEntry(userEntry.Path);
                             DirectoryEntry endOU = new DirectoryEntry(ouPath, adminUsername, adminPassword);
                             userEntry.Properties["title"].Value = jobTitle;
                             userEntry.Properties["department"].Value = departmentEntry;
                             userEntry.Properties["physicalDeliveryOfficeName"].Value = office;
 
-                            try
-                            {
-                                CheckManagerDN(); 
-                                userEntry.Properties["manager"].Value = managerDN;
-                            }
-                            catch(Exception ex)
-                            {
-                                Console.WriteLine($"An error occurred while filling manager field for the user: {ex.Message}");
-                            }
-                            userEntry.CommitChanges();
-                            try
-                            {
-                                startOU.MoveTo(endOU);
+                            try { CheckManagerDN(); userEntry.Properties["manager"].Value = managerDN; }
+                            catch (Exception ex) { Console.WriteLine($"Manager error: {ex.Message}"); }
 
-                            }
-                            catch (COMException ex)
-                            {
-                                Console.WriteLine($"An error occurred while moving the user to the traget OU: {ex.Message}");
-                            }
-                        }// end of using
+                            userEntry.CommitChanges();
+
+                            try { new DirectoryEntry(userEntry.Path).MoveTo(endOU); }
+                            catch (COMException ex) { Console.WriteLine($"Move error: {ex.Message}"); }
+                        }
+
 
                         Console.WriteLine($"User Account '{username}' Created Successfully!!!".Pastel(Color.DarkOliveGreen));
 
@@ -344,12 +616,11 @@ namespace ADUtils
                 }// end of PrincipalContect using
 
                 IsUserCreated(username);                                                                                                        // Verify account is created in AD
-                AddNewUserToGroups(username, targetOU, adminUsername, adminPassword);                                                           // Add using to basic groups based on select organizational unit (OU)
+                AddNewUserToGroups(username, region, role, adminUsername, adminPassword);                                                           // Add using to basic groups based on select organizational unit (OU)
                 CreateExchangeMailbox(adminUsername, adminPassword);                                                                            // Create local Exchange mailbox
                 CreateCLSFolder(clsUserFolder);                                                                                                 // Optional: Create CLS folder for new user
-                LaunchBRPMgr();                                                                                                                 // Optional: Open BRP manager to create BRP account manually.
                 LaunchVLMMgr();                                                                                                                 // Optional: Open VLM to add CLS license to the user
-                LaunchHostMyCallsSite();                                                                                                        // Optional: Open Hostmycalls site to add EXT
+                LaunchPhoneSystemSite();                                                                                                        // Optional: Open RingCentral site to add EXT
                 LaunchO365Site();                                                                                                               // Optional: Open O365 site to add licensees to the user.
 
                 string logEntry = ($"New Account has been created \"{firstName} {lastName} | {username}\" in Active Directory\n " +
@@ -357,12 +628,13 @@ namespace ADUtils
                                    $"\nNew Exchange MailBox has been created for \"{firstName} {lastName} | {username}\"\n" +
                                    $"\nNew CLS folder has been created for \"{firstName} {lastName} | {username}\"\n " +
                                    $"\nNew CLS license needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
-                                   $"\nNew BRP account needs to be created manually for \"{firstName} {lastName} | {username}\"\n" +
+                                   $"\nNew vMedia license needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
                                    $"\nNew EXT needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
                                    $"\nNew O365 license needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
                                    $"");
                 auditLogManager.Log(logEntry);
                 emailActionLog.Add(logEntry);
+                // TODO - Fix duplicate email log entries when creating multiple users in a row.    
             }// end of try
             catch (Exception ex)
             {
@@ -377,18 +649,19 @@ namespace ADUtils
             do
             {
                 Console.Write($"Have you completed the manual steps for CLS, BRP, Phone, Office 365?{"(Y/N)".Pastel(Color.MediumPurple)}\nEnter your choice: ");
-                string result =  Console.ReadLine().Trim().ToUpper();
-                if(result == "Y")
+                string result = Console.ReadLine().Trim().ToUpper();
+                if (result == "Y")
                 {
                     Console.WriteLine("Manual Steps complete");
                     manualSteps = true;
-                }else if(result == "N")
+                }
+                else if (result == "N")
                 {
                     Console.WriteLine("Manual Steps are reqired!!");
                 }
-            } while(!manualSteps);
+            } while (!manualSteps);
 
-        }// end of CreateUserAccount
+        }// end of CreateUserAccount*/
 
         /// <summary>
         /// Check if a user account exists in Active Directory.
@@ -436,7 +709,10 @@ namespace ADUtils
             string userGroupsString = string.Join(", ", userGroups);
             return userGroupsString;
         }// end of GetUserGroupsString
-        /// <summary>
+
+
+
+      /*  /// <summary>
         /// Add the user to the appropriate groups based on the target OU.
         /// </summary>
         /// <param name="username">The username of the new user.</param>
@@ -451,7 +727,7 @@ namespace ADUtils
             string[] itGroups = { "_COLLECT", "_COLLECTKY", "_Training", "IT", "LM_IT" };                                                                                                           // 1
             string[] collectorGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Collectors", "LM_Collector", "NoOutboundEmail" };                                                                  // 2
             string[] adminStaffGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Administrative", "Staff" };                                                                                       // 3
-            string[] attyGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Attorneys", "LM_Atty" };                                                                                                // 4
+            string[] attyGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Attorneys", "LM_Atty", "Duo_Users" };                                                                                   // 4
             string[] acctGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Accounting", "LM_Accounting", "NoAccountingEmail" };                                                                    // 5
             string[] complianceGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Compliance" };                                                                                                    // 6
 
@@ -459,31 +735,31 @@ namespace ADUtils
             // MI
             string[] michiganUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                    // 7
             string[] michiganCollectorUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "Collectors", "LM_Collector",
-                                                "NoOutboundEmail", "Horizon_Collector_RDS_Users", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                              // ##                                   
+                                                "NoOutboundEmail", "Horizon_Collector_RDS_Users", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                              // 8                                   
             string[] michiganAdminStaffUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "Administrative",
-                                                "Staff", "Horizon_RDS_Desktop_Users", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                                          // ##                                    
+                                                "Staff", "Horizon_RDS_Desktop_Users", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                                          // 9                                    
             string[] michiganAttyUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "Attorneys",
-                                                "LM_Atty", "Horizon_Attorney_RDS_Users", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                                       // ##                              
+                                                "LM_Atty", "Horizon_Attorney_RDS_Users", "MI_All_Users_Printers", "BRP_Staff_Horizon_User","Duo_Users","Deny_Outlook_OST_Redirection"  };           // 10                              
             string[] michiganAcctUsersGroups = { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "Accounting","ACHCC_Full","Horizon_ACC_WycomeMI_Map",
-                                                "Horizon_Accounting_RDS_Users","MI_Accounting_Printers", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                       // ##
+                                                "Horizon_Accounting_RDS_Users","MI_Accounting_Printers", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" };                                       // 11
 
             // GA
-            string[] georgiaUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA" };                                                                                                   // 8
+            string[] georgiaUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA" };                                                                                                 // 12
             string[] georgiaCollectorUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "Collectors", "LM_Collector",
-                                                "NoOutboundEmail", "Horizon_Collector_RDS_Users", "BRP_Staff_Horizon_User" };                                                                       // 9
+                                                "NoOutboundEmail", "Horizon_Collector_RDS_Users", "BRP_Staff_Horizon_User" };                                                                       // 13
             string[] georgiaAdminStaffUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "Administrative",
-                                                "Staff", "Horizon_RDS_Desktop_Users", "BRP_Staff_Horizon_User" };                                                                                   // 10
+                                                "Staff", "Horizon_RDS_Desktop_Users", "BRP_Staff_Horizon_User" };                                                                                   // 14
             string[] georgiaAttyUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "Attorneys",
-                                                "LM_Atty", "Georgia attorneys", "Horizon_Attorney_RDS_Users", "BRP_Staff_Horizon_User" };                                                           // 11
+                                                "LM_Atty", "Georgia attorneys", "Horizon_Attorney_RDS_Users", "BRP_Staff_Horizon_User","Duo_Users","Deny_Outlook_OST_Redirection" };                // 15
             string[] georgiaAcctUsersGroups = { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "LM_Accounting",
-                                                "NoAccountingEmail", "Horizon_Accounting_RDS_Users", "BRP_Staff_Horizon_User" };                                                                    // 12
+                                                "NoAccountingEmail", "Horizon_Accounting_RDS_Users", "BRP_Staff_Horizon_User" };                                                                    // 16
 
 
             // Remote
             string[] KYRITGroups = { "_COLLECT", "_COLLECTKY", "_Training", "IT", "LM_IT", "Horizon_IT_User" };
             string[] KYRCollectorGorups = { "_COLLECT", "_COLLECTKY", "_Training", "Collectors", "LM_Collector", "NoOutboundEmail", "Horizon_Collector_RDS_Users" };
             string[] KYRadminStaffGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Administrative", "Staff", "Horizon_RDS_Desktop_Users" };
-            string[] KYRAttyGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Attorneys", "LM_Atty", "Horizon_Attorney_RDS_Users" };
+            string[] KYRAttyGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Attorneys", "LM_Atty", "Horizon_Attorney_RDS_Users", "Duo_Users", "Deny_Outlook_OST_Redirection" };
             string[] KYRAcctGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Accounting", "LM_Accounting", "NoAccountingEmail", "Horizon_Accounting_RDS_Users" };
             string[] KYRComplianceGroups = { "_COLLECT", "_COLLECTKY", "_Training", "Compliance", "Horizon_RDS_Desktop_Users" };
 
@@ -497,12 +773,16 @@ namespace ADUtils
             else if (targetOu.Contains("Compliance") || targetOUSelection.Equals("6")) groups = complianceGroups;
             // MI
             else if (targetOu.Contains("Michigan_Users") || _myParentOU.Equals("Michigan_Users") && targetOUSelection.Equals("7")) groups = michiganUsersGroups;
+            else if (targetOu.Contains("Michigan_Users") || _myParentOU.Equals("Michigan_Users") && targetOUSelection.Equals("8")) groups = michiganUsersGroups;
+            else if (targetOu.Contains("Michigan_Users") || _myParentOU.Equals("Michigan_Users") && targetOUSelection.Equals("9")) groups = michiganUsersGroups;
+            else if (targetOu.Contains("Michigan_Users") || _myParentOU.Equals("Michigan_Users") && targetOUSelection.Equals("10")) groups = michiganUsersGroups;
+            else if (targetOu.Contains("Michigan_Users") || _myParentOU.Equals("Michigan_Users") && targetOUSelection.Equals("11")) groups = michiganUsersGroups;
             // GA
-            else if (targetOu.Contains("Cooling_Users") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("8")) groups = georgiaUsersGroups;
-            else if (targetOu.Contains("Call_Center") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("9")) groups = georgiaCollectorUsersGroups;
-            else if (targetOu.Contains("GA_Staff") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("10")) groups = georgiaAdminStaffUsersGroups;
-            else if (targetOu.Contains("GA_Litigation") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("11")) groups = georgiaAttyUsersGroups;
-            else if (targetOu.Contains("Accounting") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("12")) groups = georgiaAcctUsersGroups;
+            else if (targetOu.Contains("Cooling_Users") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("12")) groups = georgiaUsersGroups;
+            else if (targetOu.Contains("Call_Center") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("13")) groups = georgiaCollectorUsersGroups;
+            else if (targetOu.Contains("GA_Staff") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("14")) groups = georgiaAdminStaffUsersGroups;
+            else if (targetOu.Contains("GA_Litigation") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("15")) groups = georgiaAttyUsersGroups;
+            else if (targetOu.Contains("Accounting") || _myParentOU.Equals("Cooling_Users") && targetOUSelection.Equals("16")) groups = georgiaAcctUsersGroups;
 
             //TODO - update the group assignment for new hire to be dynamic. 
             // List<string> groups = GroupAssignmentHelper.GetGroups(office, targetOu);
@@ -535,9 +815,60 @@ namespace ADUtils
             {
                 Console.WriteLine($"No group assignments found for the target OU '{targetOu}'");
             }// end of else-statement
+        }// end of addUserToGroup*/
+
+
+        /// <summary>
+        /// Add the user to the appropriate groups based on the target OU.
+        /// </summary>
+        /// <param name="username">The username of the new user.</param>
+        /// <param name="targetOu">The distinguished name of the target OU.</param>
+        private void AddNewUserToGroups(string username, string region, string role, string adminUsername, string adminPassword)
+        {
+            // TODO - Fix the group assignment for new hire to be dynamic
+            // Section to add more group types
+            Thread.Sleep(processSleepTimer);
+            //TODO - update the group assignment for new hire to be dynamic. 
+            List<string> groups = GroupAssignmentHelper.GetGroups(region, role);
+           
+            if (groups != null && groups.Count > 0)
+            {
+                using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
+                {
+                    UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
+                    if (user != null)
+                    {
+                        foreach (string groupName in groups)
+                        {
+                            GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName);
+                            if (group != null)
+                            {
+                                if (!group.Members.Contains(user))
+                                {
+                                group.Members.Add(user);                                                                                                    // Adding user to groups based on selected OU
+                                group.Save();
+                                }
+                            }// end of if statement
+                            else
+                            {
+                                Console.WriteLine($"Group '{groupName}' not found in Active Directory.");
+                            }
+                        }// end of foreach
+                        Console.WriteLine($"User '{username}' added to groups: {string.Join(", ", groups)}!!!".Pastel(Color.DarkOliveGreen));
+                    }// end of if-statement
+                    else
+                    {
+                        Console.WriteLine($"User '{username}' not found for group assignment.");
+                    }// end of else-statement
+                }// end of using PrincipalContext
+            }// end of if-statement
+            else
+            {
+                Console.WriteLine($"No group assignments found for the Region='{region}', Role='{role}'");
+            }// end of else-statement
         }// end of addUserToGroup
 
-       
+
 
         /// <summary>
         /// Create a CLS folder in desired location
@@ -635,10 +966,12 @@ namespace ADUtils
                 ps.AddCommand("New-PSSession");
                 ps.AddParameter("ConfigurationName", "Microsoft.Exchange");
                 ps.AddParameter("ConnectionUri", new Uri($"http://{_myExchangeServer}/PowerShell/"));
-                ps.AddParameter("Authentication", "Kerberos");
-                ps.AddParameter("Credential", new PSCredential(adminUsername, securePassword));
+                ps.AddParameter("Authentication", "Default");                                                   // use current context session to authenticate. 
 
-              //  ps.AddParameter("Credential", new PSCredential(adminUsername, securePassword));
+               /* ps.AddParameter("Authentication", "Kerberos");
+                ps.AddParameter("Credential", new PSCredential(adminUsername, securePassword));*/
+
+
 
                 // Invoke New-PSSession to establish a session
                 Collection<PSObject> result = ps.Invoke();
@@ -718,14 +1051,14 @@ namespace ADUtils
         /// <summary>
         /// A method that launch HostMyCalls site to set the phone for the user
         /// </summary>
-        private void LaunchHostMyCallsSite()
+        private void LaunchPhoneSystemSite()
         {
             Console.WriteLine($"Please Add a extension to the new user MANUALLY!!!\nOpening HostMyCalls Site...");
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo
                 {
-                    FileName = "http://lm.hostmycalls.com",
+                    FileName = "https://login.ringcentral.com/",
                     UseShellExecute = true // This is necessary to open the URL in the default browser
                 };
                 Process.Start(psi);

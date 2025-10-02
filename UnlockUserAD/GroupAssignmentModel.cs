@@ -6,6 +6,21 @@ using System.Threading.Tasks;
 
 namespace ADUtils
 {
+    class TargetOU
+    {
+        public string Office { get; set; }
+        public string Role { get; set; }
+        public string ParentOU { get; set; }
+        public string DisplayName { get; set; }
+
+        public TargetOU(string office, string role, string parentOU, string displayName = null)
+        {
+            Office = office;
+            Role = role;
+            ParentOU = parentOU;
+            DisplayName = displayName ?? role;
+        }
+    }// end of TragetOU class
     class GroupAssignmentModel
     {
         public string Region { get; set; }
@@ -75,16 +90,6 @@ namespace ADUtils
         Region = "MI", Role = "Acct",
         Groups = new List<string> { "_COLLECT", "CollectMI-11026982418", "_Training", "_Michigan", "Accounting", "ACHCC_Full", "Horizon_ACC_WycomeMI_Map", "Horizon_Accounting_RDS_Users", "MI_Accounting_Printers", "MI_All_Users_Printers", "BRP_Staff_Horizon_User" }
     },
-    new GroupAssignmentModel
-    {
-        Region = "MI", Role = "Legal",
-        Groups = new List<string> { "_COLLECT", "_Training", "_Michigan", "CW_AllUsers", "Legal", "LM_Legal", "MI_All_Users_Printers" }
-    },
-    new GroupAssignmentModel
-    {
-        Region = "MI", Role = "Admin",
-        Groups = new List<string> { "_COLLECT", "_Training", "_Michigan", "CW_AllUsers", "Admin", "LM_Admin", "MI_All_Users_Printers", "NoOutboundEmail" }
-    },
 
     // GA
     new GroupAssignmentModel
@@ -112,16 +117,7 @@ namespace ADUtils
         Region = "GA", Role = "Acct",
         Groups = new List<string> { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "LM_Accounting", "NoAccountingEmail", "Horizon_Accounting_RDS_Users", "BRP_Staff_Horizon_User" }
     },
-    new GroupAssignmentModel
-    {
-        Region = "GA", Role = "Legal",
-        Groups = new List<string> { "_COLLECT", "_Training", "CW_AllUsers", "Legal", "LM_Legal" }
-    },
-    new GroupAssignmentModel
-    {
-        Region = "GA", Role = "Admin",
-        Groups = new List<string> { "_COLLECT", "_Training", "CW_AllUsers", "Admin", "LM_Admin", "NoOutboundEmail" }
-    },
+
 
     // KY Remote (optional if different from KY standard)
     new GroupAssignmentModel
