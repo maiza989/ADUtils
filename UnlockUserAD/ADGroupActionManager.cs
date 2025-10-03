@@ -11,7 +11,7 @@ namespace ADUtils
 
         EmailNotifcationManager emailNotifcation = new EmailNotifcationManager(Program.configuration);
         AuditLogManager auditLogManager;
-      
+        List<string> emailActionLog = new List<string>();
         public ADGroupActionManager(AuditLogManager auditLogManager)
         {
             //auditLogManager.RedirectConsoleOutput();                                                                                                                 // Comment out if you want to log everything in the console ** Does not log password **.
@@ -25,7 +25,6 @@ namespace ADUtils
         public void AddUserToGroup(PrincipalContext context)
         {
             bool isExit = false;
-            List<string> emailActionLog = new List<string>();                                                                                                          // Email log list
 
             do
             {

@@ -9,7 +9,8 @@ namespace ADUtils
 {
     public class AccountDeactivationManager
     {
-        
+        private List<string> emailActionLog = new List<string>();
+        EmailNotifcationManager emailNotification = new EmailNotifcationManager(Program.configuration);
 
         // TODO - DONE Fix accountcreationmanager null reference exception -
 
@@ -64,6 +65,7 @@ namespace ADUtils
                                     userEntry.CommitChanges();
                                     startOU.MoveTo(endOU);
                                     Console.WriteLine($"User account '{username}' has been moved to Ex Employee OU".Pastel(Color.LimeGreen));
+                                    emailActionLog.Add($"User account '{username}' has been disabled.\nAccount will be deleted on '{deletionDateString}'");
                                 }// end of using
                             }// end of if statement
                             else
@@ -76,12 +78,17 @@ namespace ADUtils
                             Console.WriteLine($"\tUser account '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
                         }// end of else statement
                     }// end of try
-                    catch
+                    catch(Exception ex)
                     {
-
+                        Console.WriteLine($"Error deactivating user '{username}': {ex.Message}".Pastel(Color.Crimson));
                     }// end of catch
                 }// end of else statement
             } while(!returnToMenu);   
+            if (emailActionLog.Count > 0)
+            {
+                string emailBody = string.Join("\n", emailActionLog);
+                emailNotification.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
+            }// end of if statement
         }// end of DeactivateUserAccount
     }// end of class
 }// end of namespace
