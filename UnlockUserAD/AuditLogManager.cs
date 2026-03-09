@@ -10,11 +10,11 @@ namespace ADUtils
         private readonly string _BaseLogDirectory;                                                                                // Replace with your desire log location                                
         private string logFilePath;
 
-/*
-        public AuditLogManager(IConfiguration configuration)
-        {
-            _BaseLogDirectory = configuration["LoggingSettings:BaseLogDirectory"];
-        }*/
+        /*
+                public AuditLogManager(IConfiguration configuration)
+                {
+                    _BaseLogDirectory = configuration["LoggingSettings:BaseLogDirectory"];
+                }*/
 
         /// <summary>
         /// A constructor that create and ensure the for log file exists.
@@ -25,9 +25,9 @@ namespace ADUtils
             _BaseLogDirectory = configuration["LoggingSettings:BaseLogDirectory"];
             try
             {
-            logFilePath = Path.Combine(_BaseLogDirectory, $"{adminUsername}.log");                                                // Create a log file based on the user logged into ADUtil
-            Directory.CreateDirectory(_BaseLogDirectory);                                                                         // Ensure the directory exist
-            InitilizeLogFile();                                                                                                  // Set append mode.
+                logFilePath = Path.Combine(_BaseLogDirectory, $"{adminUsername}.log");                                                // Create a log file based on the user logged into ADUtil
+                Directory.CreateDirectory(_BaseLogDirectory);                                                                         // Ensure the directory exist
+                InitilizeLogFile();                                                                                                  // Set append mode.
             }// end of try
             catch (Exception ex)
             {

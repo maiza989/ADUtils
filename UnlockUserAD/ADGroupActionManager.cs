@@ -5,9 +5,9 @@ using System.Security.Cryptography.X509Certificates;
 using System.Management.Automation;
 
 namespace ADUtils
-{ 
+{
     public class ADGroupActionManager
-    {       
+    {
 
         EmailNotifcationManager emailNotifcation = new EmailNotifcationManager(Program.configuration);
         AuditLogManager auditLogManager;
@@ -16,7 +16,7 @@ namespace ADUtils
         {
             //auditLogManager.RedirectConsoleOutput();                                                                                                                 // Comment out if you want to log everything in the console ** Does not log password **.
             this.auditLogManager = auditLogManager;
-            
+
         }
         /// <summary>
         /// A method to add user to group security and distrbuiton list in Active Directory.
@@ -49,19 +49,19 @@ namespace ADUtils
                     try
                     {
 
-                       /* X509Certificate2 certificate = Program.GetAdminCertificate();
-                        if (certificate == null)
-                        {
-                            Console.WriteLine("No valid smart card certificate found.");
-                            return;
-                        }*/
+                        /* X509Certificate2 certificate = Program.GetAdminCertificate();
+                         if (certificate == null)
+                         {
+                             Console.WriteLine("No valid smart card certificate found.");
+                             return;
+                         }*/
                         UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);                                              // Check for user in AD
 
                         if (user != null)
                         {
 
                             GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName);                                                                   // Check for group in AD
-                            
+
                             if (group != null)
                             {
                                 if (!group.Members.Contains(user))                                                                                                      // If the user is not in the group add him
@@ -97,7 +97,7 @@ namespace ADUtils
                     }// end of catch
                 }
             } while (!isExit);
-            if(emailActionLog.Count > 0 )
+            if (emailActionLog.Count > 0)
             {
                 string emailBody = string.Join("\n", emailActionLog);
                 emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
@@ -188,73 +188,73 @@ namespace ADUtils
             }
         }// end of AddUserToGroup
 
-     /*   public void AddUserToSharedMailbox()
-        {
-            bool isExit = false;
-            List<string> emailActionLog = new List<string>();
+        /*   public void AddUserToSharedMailbox()
+           {
+               bool isExit = false;
+               List<string> emailActionLog = new List<string>();
 
-            do
-            {
-                Console.Write($"Enter the username (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
-                string username = Console.ReadLine().Trim();
-                if (username.ToLower() == "exit")
-                {
-                    isExit = true;
-                    Console.WriteLine("\nReturning to menu...");
-                    break;
-                }// end of if statement 
+               do
+               {
+                   Console.Write($"Enter the username (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                   string username = Console.ReadLine().Trim();
+                   if (username.ToLower() == "exit")
+                   {
+                       isExit = true;
+                       Console.WriteLine("\nReturning to menu...");
+                       break;
+                   }// end of if statement 
 
-                Console.Write($"Enter the shared mailbox email or alias (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
-                string sharedMailbox = Console.ReadLine().Trim();
-                if (sharedMailbox.ToLower() == "exit")
-                {
-                    isExit = true;
-                    Console.WriteLine("\nReturning to menu...");
-                    break;
-                }// end of if statement
+                   Console.Write($"Enter the shared mailbox email or alias (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                   string sharedMailbox = Console.ReadLine().Trim();
+                   if (sharedMailbox.ToLower() == "exit")
+                   {
+                       isExit = true;
+                       Console.WriteLine("\nReturning to menu...");
+                       break;
+                   }// end of if statement
 
-                try
-                {
-                    using (PowerShell ps = PowerShell.Create())
-                    {
-                        ps.AddScript($@"
-                                    Import-Module ExchangeOnlineManagement;
-                                    Connect-ExchangeOnline -UserPrincipalName malghamgham@lloydmc.com -ErrorAction Stop;
-                                    Add-MailboxPermission -Identity '{sharedMailbox}' -User '{username}' -AccessRights FullAccess -InheritanceType All -ErrorAction Stop;
-                                    Add-RecipientPermission -Identity '{sharedMailbox}' -Trustee '{username}' -AccessRights SendAs -Confirm:$false -ErrorAction Stop;
-                                    Disconnect-ExchangeOnline -Confirm:$false;
-                                    ");
-                         var results = ps.Invoke();
+                   try
+                   {
+                       using (PowerShell ps = PowerShell.Create())
+                       {
+                           ps.AddScript($@"
+                                       Import-Module ExchangeOnlineManagement;
+                                       Connect-ExchangeOnline -UserPrincipalName malghamgham@lloydmc.com -ErrorAction Stop;
+                                       Add-MailboxPermission -Identity '{sharedMailbox}' -User '{username}' -AccessRights FullAccess -InheritanceType All -ErrorAction Stop;
+                                       Add-RecipientPermission -Identity '{sharedMailbox}' -Trustee '{username}' -AccessRights SendAs -Confirm:$false -ErrorAction Stop;
+                                       Disconnect-ExchangeOnline -Confirm:$false;
+                                       ");
+                            var results = ps.Invoke();
 
-                        if (ps.HadErrors)
-                        {
-                            foreach (var error in ps.Streams.Error)
-                            {
-                                Console.WriteLine($"Error: {error.ToString()}".Pastel(Color.IndianRed));
-                            }// end of foreach
-                        }// end of if statement
-                        else
-                        {
-                            Console.WriteLine($"User '{username}' granted FullAccess to shared mailbox '{sharedMailbox}'.".Pastel(Color.LimeGreen));
-                            string logEntry = $"\"{username}\" granted FullAccess to \"{sharedMailbox}\" shared mailbox in Exchange\n";
-                            emailActionLog.Add(logEntry);
-                            auditLogManager.Log(logEntry);
-                        }// end of else statement
-                    }// end of using statement
-                }// end of try
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Exception while adding user to shared mailbox: {ex.Message}".Pastel(Color.IndianRed));
-                }// end of catch
+                           if (ps.HadErrors)
+                           {
+                               foreach (var error in ps.Streams.Error)
+                               {
+                                   Console.WriteLine($"Error: {error.ToString()}".Pastel(Color.IndianRed));
+                               }// end of foreach
+                           }// end of if statement
+                           else
+                           {
+                               Console.WriteLine($"User '{username}' granted FullAccess to shared mailbox '{sharedMailbox}'.".Pastel(Color.LimeGreen));
+                               string logEntry = $"\"{username}\" granted FullAccess to \"{sharedMailbox}\" shared mailbox in Exchange\n";
+                               emailActionLog.Add(logEntry);
+                               auditLogManager.Log(logEntry);
+                           }// end of else statement
+                       }// end of using statement
+                   }// end of try
+                   catch (Exception ex)
+                   {
+                       Console.WriteLine($"Exception while adding user to shared mailbox: {ex.Message}".Pastel(Color.IndianRed));
+                   }// end of catch
 
-            } while (!isExit);
+               } while (!isExit);
 
-            if (emailActionLog.Count > 0)
-            {
-                string emailBody = string.Join("\n", emailActionLog);
-                emailNotifcation.SendEmailNotification("ADUtil Action: Shared Mailbox Permission Granted", emailBody);
-            }// end of if statement
-        }// end of AddUserToSharedMailbox*/
+               if (emailActionLog.Count > 0)
+               {
+                   string emailBody = string.Join("\n", emailActionLog);
+                   emailNotifcation.SendEmailNotification("ADUtil Action: Shared Mailbox Permission Granted", emailBody);
+               }// end of if statement
+           }// end of AddUserToSharedMailbox*/
 
         /// <summary>
         /// A method that list all group secuirty and distrubtion list in Active Directory.
@@ -334,7 +334,7 @@ namespace ADUtils
                         if (group != null)
                         {
                             Console.WriteLine($"\nMembers of group '{groupName}':");
-                           
+
                             List<string> memberNames = new List<string>();
                             foreach (var member in group.GetMembers())
                             {

@@ -5,6 +5,7 @@ using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Text.RegularExpressions;
 using ADUtils;
+using ActiveDs;
 
 
 // TODO - DONE Add feature to Reset user password.
@@ -19,7 +20,7 @@ namespace ADUtils
         public PasswordManager() { }
         public PasswordManager(AuditLogManager auditLogManager)
         {
-           this.auditLogManager = auditLogManager;
+            this.auditLogManager = auditLogManager;
         }
 
         /// <summary>
@@ -79,7 +80,7 @@ namespace ADUtils
                 }// end of using
 
             }// end of try
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine($"Error resetting password: {ex.Message}");
             }// end of catch
@@ -93,7 +94,7 @@ namespace ADUtils
         /// <returns></returns>
         private bool IsPasswordVaild(string password)
         {
-            if(password.Length < 15)
+            if (password.Length < 15)
             {
                 Console.WriteLine($"\nThe password \"{password}\" is less than 15 characters!\n");
                 return false;
@@ -117,7 +118,7 @@ namespace ADUtils
                 {
                     Console.WriteLine($"\nThe password \"{password}\" does not have digits!");
                 }
-                if(hasSymbol == false)
+                if (hasSymbol == false)
                 {
                     Console.WriteLine($"The password\"{password}\" does not have symbols!");
                 }
@@ -159,7 +160,7 @@ namespace ADUtils
                             Console.WriteLine($"Password for user '{username}' never expires.");
                             Console.ForegroundColor = ConsoleColor.Gray;
                         }// end of inner if-statement
-                        
+
                     }// end of outter if-satetment
                     else
                     {
@@ -203,12 +204,12 @@ namespace ADUtils
             ActiveDs.IADsUser nativeDeUser = (ActiveDs.IADsUser)deUser.NativeObject;
             DateTime passwordLastChanged = nativeDeUser.PasswordLastChanged;
 
-            if(passwordLastChanged == null)
+            if (passwordLastChanged == null)
             {
                 Console.WriteLine("Check if the password was never set");
                 return null;
             }
-            
+
             return passwordLastChanged;                                                                                                       // Return the password last time it changed for the user
         }// end of getPaswordLastSetDate
 

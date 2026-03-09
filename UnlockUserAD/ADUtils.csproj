@@ -12,6 +12,7 @@
     <None Remove="Appsettings.json" />
   </ItemGroup>
 
+  
   <ItemGroup>
     <COMReference Include="ActiveDs">
       <WrapperTool>tlbimp</WrapperTool>
@@ -23,7 +24,6 @@
       <EmbedInteropTypes>true</EmbedInteropTypes>
     </COMReference>
   </ItemGroup>
-
   <ItemGroup>
     <Content Include="Appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

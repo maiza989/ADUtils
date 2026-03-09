@@ -15,12 +15,12 @@ namespace ADUtils
         private readonly string _myFromEmail;
         private readonly string _myToEmail;
         private readonly string _myPassword;
-       // string mySTMPServer = Environment.GetEnvironmentVariable("STMP_SERVER");                                                            // Replace with your STMP server.
-       // string myFromEmail = Environment.GetEnvironmentVariable("MY_FROMEMAIL");                                                            // Replace with your From email
-       // string myToEmail = Environment.GetEnvironmentVariable("MY_TOEMAIL");                                                                // Replace with your To email
-       // string myPassword = Environment.GetEnvironmentVariable("MY_PASSWORD");                                                              // Replace with your email password
+        // string mySTMPServer = Environment.GetEnvironmentVariable("STMP_SERVER");                                                            // Replace with your STMP server.
+        // string myFromEmail = Environment.GetEnvironmentVariable("MY_FROMEMAIL");                                                            // Replace with your From email
+        // string myToEmail = Environment.GetEnvironmentVariable("MY_TOEMAIL");                                                                // Replace with your To email
+        // string myPassword = Environment.GetEnvironmentVariable("MY_PASSWORD");                                                              // Replace with your email password
 
-     
+
         public EmailNotifcationManager(IConfiguration configuration)
         {
 
