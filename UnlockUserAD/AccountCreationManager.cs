@@ -444,6 +444,8 @@ namespace ADUtils
             // -------------------------
             var TargetOUs = new List<TargetOU>
     {
+                //TODO - fix empty target OU for MI and GA users.
+                //TODO - Test MI and GA user creation with group membership assignment.
         // KY
         new TargetOU("KY", "IT", "LloydMc_Lou"),
         new TargetOU("KY", "Collector", "LloydMc_Lou"),
@@ -453,17 +455,17 @@ namespace ADUtils
         new TargetOU("KY", "Compliance", "LloydMc_Lou"),
 
         // MI
-        new TargetOU("MI", "", "Michigan_Users", "Michigan Users"),
-        new TargetOU("MI", "", "Michigan_Users", "Michigan Collector"),
-        new TargetOU("MI", "", "Michigan_Users", "Michigan Admin Staff"),
-        new TargetOU("MI", "", "Michigan_Users", "Michigan Atty"),
-        new TargetOU("MI", "", "Michigan_Users", "Michigan Accounting"),
+        new TargetOU("MI", "General", "Michigan_Users", "Michigan Users"),
+        new TargetOU("MI", "Collector", "Michigan_Users", "Michigan Collector"),
+        new TargetOU("MI", "Admin Staff", "Michigan_Users", "Michigan Admin Staff"),
+        new TargetOU("MI", "Atty", "Michigan_Users", "Michigan Atty"),
+        new TargetOU("MI", "Acct", "Michigan_Users", "Michigan Accounting"),
 
         // GA
         new TargetOU("GA", "", "Cooling_Users", "Default Georgia Users"),
         new TargetOU("GA", "Call_Center", "Cooling_Users", "Georgia Collector"),
         new TargetOU("GA", "GA_Staff", "Cooling_Users", "Georgia Admin Staff"),
-        new TargetOU("GA", "", "Cooling_Users", "Georgia Atty"),
+        new TargetOU("GA", "Atty", "Cooling_Users", "Georgia Atty"),
         new TargetOU("GA", "Accounting", "Cooling_Users", "Georgia Accounting"),
 
         // Remote

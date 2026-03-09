@@ -9,6 +9,10 @@ using System.Linq;
 using Pastel;
 using System.Drawing;
 using System.Diagnostics.Eventing.Reader;
+using Newtonsoft.Json.Linq;
+using System.Runtime.InteropServices;
+using System.Security.Principal;
+using System.Security;
 
 namespace ADUtils
 {
@@ -16,9 +20,65 @@ namespace ADUtils
     public class ActiveDirectoryManager
     {
         PasswordManager passwordManager = new PasswordManager();
+/*
+        // ✅ ADDED: P/Invoke for LogonUser
+        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool LogonUser(
+            string username,
+            string domain,
+            string password,
+            int logonType,
+            int logonProvider,
+            out IntPtr token);
 
-       
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr handle);
 
+        private const int LOGON32_LOGON_INTERACTIVE = 2;
+        private const int LOGON32_PROVIDER_DEFAULT = 0;
+        const int LOGON32_LOGON_NEW_CREDENTIALS = 9;
+
+        // ✅ ADDED: Admin credential properties
+        private readonly string _domain = "lmdc4";
+        private readonly string _adminUsername = "admmalghamgham";
+        private readonly string _adminPassword = "****"; // TODO - Update this when testing
+*/
+     /*   public ActiveDirectoryManager(string domain, string adminUsername, string adminPassword)
+        {
+            _domain = domain;
+            _adminUsername = adminUsername;
+            _adminPassword = adminPassword;
+        }*/
+
+    /*    // ✅ ADDED: Helper to run any AD operation as the admin user
+        private void RunAsAdmin(Action action)
+        {
+            IntPtr adminToken = IntPtr.Zero;
+            try
+            {
+                bool success = LogonUser(
+                    _adminUsername,
+                    _domain,
+                    _adminPassword,
+                    LOGON32_LOGON_NEW_CREDENTIALS,
+                    LOGON32_PROVIDER_DEFAULT,
+                    out adminToken);
+
+                if (!success)
+                    throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+
+                using (WindowsIdentity adminIdentity = new WindowsIdentity(adminToken))
+                {
+                    WindowsIdentity.RunImpersonated(adminIdentity.AccessToken, action);
+                }
+            }
+            finally
+            {
+                if (adminToken != IntPtr.Zero)
+                    CloseHandle(adminToken);
+            }
+        }
+*/
         /// <summary>
         /// A method that display a general information about a user.
         /// </summary>
@@ -147,7 +207,7 @@ namespace ADUtils
                     if (user != null && user.IsAccountLockedOut())                                                                             // If-statement to unlock all users
                     {
                         user.UnlockAccount();
-                        Console.WriteLine($"\t[{DateTime.Now:MM-dd-yyyy HH:mm:ss t}]: User account '{user.SamAccountName}' has been unlocked.".Pastel(Color.LimeGreen));
+                        Console.WriteLine($"\t[{DateTime.Now:MM-dd-yyyy HH:mm:ss tt}]: User account '{user.SamAccountName}' has been unlocked.".Pastel(Color.LimeGreen));
                         anyUnlocked = true;
                     }// end of if-statement
                 }// end of foreach
@@ -167,37 +227,129 @@ namespace ADUtils
         }// end of UnlockAllUsers
 
         // TODO - grab the lockout event
+        /*
+                private void PrintLockoutEventDetails(string username)
+                {
+                    string query = $"*[System/EventID=4740] and *[EventData[Data[@Name='TargetUserName'] and (Data='{username}')]]";
+                    EventLogQuery eventsQuery = new EventLogQuery("Security", PathType.LogName, query);
 
-        private void PrintLockoutEventDetails(string username)
+                    try
+                    {
+                        using (EventLogReader logReader = new EventLogReader(eventsQuery))
+                        {
+                            EventRecord eventRecord = logReader.ReadEvent();
+                            if (eventRecord != null)
+                            {
+                                // Extract relevant details
+                                string workstation = eventRecord.Properties[1].Value.ToString();
+                                string lockedUser = eventRecord.Properties[0].Value.ToString();
+                                DateTime? lockoutTime = eventRecord.TimeCreated;
+
+                                Console.WriteLine($"\tAccount: {lockedUser} was locked on workstation: {workstation} at {lockoutTime}".Pastel(Color.Gold));
+                            }
+                            else
+                            {
+                                Console.WriteLine($"\tNo lockout events found for {username}.".Pastel(Color.OrangeRed));
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error fetching lockout details: {ex.Message}".Pastel(Color.IndianRed));
+                    }
+                }
+        */
+
+   /*     /// <summary>
+        /// Reads Security Event Log for Event ID 4740 and returns the CallerComputerName
+        /// </summary>
+        private string GetWorkstationNameFromEvent(string username)
         {
-            string query = $"*[System/EventID=4740] and *[EventData[Data[@Name='TargetUserName'] and (Data='{username}')]]";
-            EventLogQuery eventsQuery = new EventLogQuery("Security", PathType.LogName, query);
+            string domainController = "DC01.domain.local"; // ✅ Replace with your actual DC
+            if (string.IsNullOrEmpty(_adminUsername) || string.IsNullOrEmpty(_adminPassword))
+            {
+                Console.WriteLine("Admin credentials are missing.");
+                return "Unknown";
+            }
 
             try
             {
-                using (EventLogReader logReader = new EventLogReader(eventsQuery))
-                {
-                    EventRecord eventRecord = logReader.ReadEvent();
-                    if (eventRecord != null)
-                    {
-                        // Extract relevant details
-                        string workstation = eventRecord.Properties[1].Value.ToString();
-                        string lockedUser = eventRecord.Properties[0].Value.ToString();
-                        DateTime? lockoutTime = eventRecord.TimeCreated;
+                SecureString securePassword = new SecureString();
+                foreach (char c in _adminPassword)
+                    securePassword.AppendChar(c);
+                securePassword.MakeReadOnly();
 
-                        Console.WriteLine($"\tAccount: {lockedUser} was locked on workstation: {workstation} at {lockoutTime}".Pastel(Color.Gold));
-                    }
-                    else
+                using (var session = new EventLogSession(
+                           domainController,
+                           _domain,
+                           _adminUsername,
+                           securePassword,
+                           SessionAuthentication.Default))
+                {
+                    string query = "*[System[EventID=4740]]";
+                    EventLogQuery eventsQuery = new EventLogQuery("Security", PathType.LogName, query)
                     {
-                        Console.WriteLine($"\tNo lockout events found for {username}.".Pastel(Color.OrangeRed));
+                        Session = session
+                    };
+
+                    using (EventLogReader logReader = new EventLogReader(eventsQuery))
+                    {
+                        for (EventRecord evt = logReader.ReadEvent(); evt != null; evt = logReader.ReadEvent())
+                        {
+                            string xml = evt.ToXml();
+                            if (xml.Contains(username, StringComparison.OrdinalIgnoreCase))
+                            {
+                                string callerName = ExtractCallerComputerName(xml);
+                                evt.Dispose();
+                                if (!string.IsNullOrEmpty(callerName))
+                                    return callerName;
+                            }
+                            evt.Dispose();
+                        }
                     }
                 }
             }
+            catch (UnauthorizedAccessException)
+            {
+                Console.WriteLine($"Access denied while reading Security log on {domainController}. " +
+                                  $"Ensure {_adminUsername} has 'Event Log Readers' permission or run as Domain Admin."
+                                  .Pastel(Color.DarkOrange));
+            }
+            catch (EventLogNotFoundException ex)
+            {
+                Console.WriteLine($"Security log not found on {domainController}: {ex.Message}".Pastel(Color.IndianRed));
+            }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error fetching lockout details: {ex.Message}".Pastel(Color.IndianRed));
+                Console.WriteLine($"Error getting workstation for {username}: {ex.Message}".Pastel(Color.DarkOrange));
             }
+
+            return "Unknown";
         }
+
+
+        /// <summary>
+        /// Extracts the CallerComputerName value from event XML
+        /// </summary>
+        private string ExtractCallerComputerName(string xml)
+        {
+            try
+            {
+                var startTag = "<Data Name='CallerComputerName'>";
+                var endTag = "</Data>";
+                int startIndex = xml.IndexOf(startTag);
+                if (startIndex == -1) return null;
+                startIndex += startTag.Length;
+                int endIndex = xml.IndexOf(endTag, startIndex);
+                if (endIndex == -1) return null;
+                return xml.Substring(startIndex, endIndex - startIndex).Trim();
+            }
+            catch
+            {
+                return null;
+            }
+        }*/
+
 
         /// <summary>
         /// A method to check if any user is locked in Active Directory.
@@ -205,44 +357,65 @@ namespace ADUtils
         /// <param name="context">Based in what the computer domain</param>
         public void CheckLockedAccounts(PrincipalContext context)                                                                        
         {
-            Console.WriteLine("\nLocked user accounts:");
-            try
-            {
-                PrincipalSearcher searcher = new PrincipalSearcher(new UserPrincipal(context) { Enabled = true });                              // Creating the search object
-                bool isAnyLocked = false;
-                foreach (var result in searcher.FindAll())                                                                                      // Look through what is in the user search object
+           // RunAsAdmin(() =>
+           // {
+                Console.WriteLine("\nLocked user accounts:");
+                try
                 {
-                    UserPrincipal user = result as UserPrincipal;
-                    if(!user.IsAccountLockedOut() || user == null)
+                    PrincipalSearcher searcher = new PrincipalSearcher(new UserPrincipal(context) { Enabled = true });                              // Creating the search object
+                    bool isAnyLocked = false;
+                    foreach (var result in searcher.FindAll())                                                                                      // Look through what is in the user search object
                     {
-                        continue;
-                    }
-                    if (user != null && user.IsAccountLockedOut())                                                                              // Print out all locked users
-                    {
-                        DirectoryEntry directoryEntry = (user.GetUnderlyingObject() as DirectoryEntry);
-                        DateTime? lockoutTime = null;
-                        // TODO - Fix grabbing time lock out for users.
-                        if (directoryEntry.Properties.Contains("lockoutTime"))
+                        UserPrincipal user = result as UserPrincipal;
+                        if(!user.IsAccountLockedOut() || user == null)
                         {
-                            long lockoutTicks = (long)directoryEntry.Properties["lockoutTime"].Value;
-                            if(lockoutTicks > 0)
-                            {
-                                lockoutTime = DateTime.FromFileTimeUtc(lockoutTicks).ToLocalTime();
-                            }
-                        Console.WriteLine($"\t[{lockoutTime?.ToString("MM-dd-yyyy HH:mm:ss")}] - {user.SamAccountName}".Pastel(Color.Crimson));
+                            continue;
                         }
-                        isAnyLocked = true;
+                        if (user != null && user.IsAccountLockedOut())                                                                              // Print out all locked users
+                        {
+                            DirectoryEntry directoryEntry = (user.GetUnderlyingObject() as DirectoryEntry);
+                            DateTime? lockoutTime = null;
+                            string workstationName = "N/A";
+
+
+                            // TODO - DONE Fix grabbing time lock out for users.
+                            if (directoryEntry.Properties.Contains("lockoutTime"))
+                            {
+                                object lockOutValue = directoryEntry.Properties["lockoutTime"].Value;
+                                if (lockOutValue != null)
+                                {
+                                    long lockoutTicks = 0;
+                                        try
+                                        {
+                                            var highPart = (int)lockOutValue.GetType().InvokeMember("HighPart", System.Reflection.BindingFlags.GetProperty, null, lockOutValue, null);
+                                            var lowPart = (int)lockOutValue.GetType().InvokeMember("LowPart", System.Reflection.BindingFlags.GetProperty, null, lockOutValue, null);
+                                            lockoutTicks = ((long)highPart << 32) + (uint)lowPart;
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Console.WriteLine($"Error reading lockoutTime COM object for {user.SamAccountName}: {ex.Message}");
+                                        }
+                                    if (lockoutTicks > 0)
+                                    {
+                                        lockoutTime = DateTime.FromFileTimeUtc(lockoutTicks).ToLocalTime();
+                                    }
+                                }
+                            //    workstationName = GetWorkstationNameFromEvent(user.SamAccountName);
+                                Console.WriteLine($"\t[{lockoutTime?.ToString("MM-dd-yyyy HH:mm:ss tt")}] - {user.SamAccountName} - Workstation: {workstationName}".Pastel(Color.Crimson));
+                            }
+                            isAnyLocked = true;
+                        }// end of if-statement
+                    }// end of foreach
+                    if (!isAnyLocked)
+                    {
+                        Console.WriteLine($"\tNo accounts are LOCKED!!! YAY!!!.".Pastel(Color.RoyalBlue));
                     }// end of if-statement
-                }// end of foreach
-                if (!isAnyLocked)
+                }// end of try-catch
+                catch (Exception ex)
                 {
-                    Console.WriteLine($"\tNo accounts are LOCKED!!! YAY!!!.".Pastel(Color.RoyalBlue));
-                }// end of if-statement
-            }// end of try-catch
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex.Message}".Pastel(Color.IndianRed));
-            }// end of catch
+                    Console.WriteLine($"Error: {ex.Message}".Pastel(Color.IndianRed));
+                }// end of catch
+          //  });
         }// end of CheckLockedAccounts
     }// end of class
 }// end of spacename

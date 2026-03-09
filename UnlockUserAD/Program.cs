@@ -53,18 +53,19 @@ class Program
 
     static void Main(string[] args)
     {
+        configuration = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("Appsettings.json", optional: false, reloadOnChange: true)
+            .Build();
+
         ActiveDirectoryManager ADManager = new ActiveDirectoryManager();
         AccountCreationManager ACManager;
         PasswordManager PWDManager = null;
         ADGroupActionManager ADGroupManager = null;
         AuditLogManager auditLogManager = null;
+        EmailNotifcationManager emailManager = new EmailNotifcationManager(configuration);
         AccountDeactivationManager ACCDeactivationManager = new AccountDeactivationManager();
 
-        configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("Appsettings.json", optional: false, reloadOnChange: true)
-            .Build();
-        EmailNotifcationManager emailManager = new EmailNotifcationManager(configuration);
         string _myDomainName = configuration["AccountCreationSettings:myDomainName"];
 
         Console.WriteLine("Starting Active Directory Manager...");
