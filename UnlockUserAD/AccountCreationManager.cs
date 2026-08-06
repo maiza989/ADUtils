@@ -420,17 +420,17 @@ namespace ADUtils
         {
             while (true)
             {
-                Console.Write(prompt);
+                AppLog.Prompt(prompt);
                 string value = ConsoleInput.ReadTrimmed();
 
                 if (value.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine("\nReturning to menu....".Pastel(Color.Gray));
+                    AppLog.Screen("\nReturning to menu....", Color.Gray);
                     return null;
                 }
                 if (value.Length == 0)
                 {
-                    Console.WriteLine($"{fieldLabel} is required (or type {"'exit'".Pastel(Color.MediumPurple)} to return to the menu).".Pastel(Color.IndianRed));
+                    AppLog.Warn($"{fieldLabel} is required (or type {"'exit'".Pastel(Color.MediumPurple)} to return to the menu).", color: Color.IndianRed);
                     continue;
                 }
                 // These land in the CN and the DN. Reject the RFC 4514 special characters rather
@@ -438,7 +438,7 @@ namespace ADUtils
                 int bad = value.IndexOfAny(new[] { ',', '+', '"', '\\', '<', '>', ';', '=', '#', '/' });
                 if (bad >= 0)
                 {
-                    Console.WriteLine($"{fieldLabel} cannot contain '{value[bad]}' — it is reserved in Active Directory names.".Pastel(Color.IndianRed));
+                    AppLog.Warn($"{fieldLabel} cannot contain '{value[bad]}' — it is reserved in Active Directory names.", color: Color.IndianRed);
                     continue;
                 }
                 return value;
@@ -504,19 +504,19 @@ namespace ADUtils
             lastName = PromptForRequiredName("Enter new user's last name: ", "Last name");
             if (lastName == null) return;
 
-            Console.Write("Enter user's job title: ");
+            AppLog.Prompt("Enter user's job title: ");
             jobTitle = ConsoleInput.ReadTrimmed();
 
-            Console.Write("Enter user's department: ");
+            AppLog.Prompt("Enter user's department: ");
             departmentEntry = ConsoleInput.ReadTrimmed();
 
-            Console.Write("Enter user description: ");
+            AppLog.Prompt("Enter user description: ");
             description = ConsoleInput.ReadTrimmed();
 
-            Console.Write("Enter user office (KY, MI, GA, or Remote): ");
+            AppLog.Prompt("Enter user office (KY, MI, GA, or Remote): ");
             office = ConsoleInput.ReadTrimmedUpper();
 
-            Console.Write("Enter user manager (SAM Account Name): ");
+            AppLog.Prompt("Enter user manager (SAM Account Name): ");
             manager = ConsoleInput.ReadTrimmed();
 
             // -------------------------
@@ -562,27 +562,27 @@ namespace ADUtils
             var filteredOptions = TargetOUs.Where(o => o.Office == office).ToList();
             if (!filteredOptions.Any())
             {
-                Console.WriteLine($"'{office}' is not a recognized office. Valid values: " +
-                                  $"{string.Join(", ", TargetOUs.Select(o => o.Office).Distinct())}.".Pastel(Color.IndianRed));
-                Console.WriteLine("Returning to menu — no account was created.".Pastel(Color.Gray));
+                AppLog.Warn($"'{office}' is not a recognized office. Valid values: " +
+                            $"{string.Join(", ", TargetOUs.Select(o => o.Office).Distinct())}.", color: Color.IndianRed);
+                AppLog.Screen("Returning to menu — no account was created.", Color.Gray);
                 return;
             }
 
             // -------------------------
             // Display options and get selection
             // -------------------------
-            Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}:");
+            AppLog.Screen($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}:");
             for (int i = 0; i < filteredOptions.Count; i++)
-                Console.WriteLine($"{i + 1}- {filteredOptions[i].DisplayName}");
+                AppLog.Screen($"{i + 1}- {filteredOptions[i].DisplayName}");
 
             int choice;
             bool validInput;
             do
             {
-                Console.Write("Enter your choice: ");
+                AppLog.Prompt("Enter your choice: ");
                 validInput = int.TryParse(ConsoleInput.ReadTrimmed(), out choice) && choice >= 1 && choice <= filteredOptions.Count;
                 if (!validInput)
-                    Console.WriteLine($"Invalid input, please enter a number between 1 and {filteredOptions.Count}.".Pastel(Color.IndianRed));
+                    AppLog.Warn($"Invalid input, please enter a number between 1 and {filteredOptions.Count}.", color: Color.IndianRed);
             } while (!validInput);
 
             var selectedOU = filteredOptions[choice - 1];
@@ -597,8 +597,8 @@ namespace ADUtils
             var plannedGroups = GroupAssignmentHelper.GetGroups(region, role);
             if (plannedGroups.Count == 0)
             {
-                Console.WriteLine($"No group assignment is defined for Region='{region}', Role='{role}'.".Pastel(Color.IndianRed));
-                Console.WriteLine("Add it to GroupAssignmentHelper before creating this account. Nothing was created.".Pastel(Color.Gray));
+                AppLog.Warn($"No group assignment is defined for Region='{region}', Role='{role}'.", color: Color.IndianRed);
+                AppLog.Screen("Add it to GroupAssignmentHelper before creating this account. Nothing was created.", Color.Gray);
                 return;
             }
 
@@ -617,48 +617,53 @@ namespace ADUtils
             // unhelpful COM error otherwise.
             if (username.Length > 20)
             {
-                Console.WriteLine($"Generated username '{username}' is {username.Length} characters; " +
-                                  "AD allows a maximum of 20. Shorten the last name or create this account manually.".Pastel(Color.IndianRed));
+                AppLog.Error($"Generated username '{username}' is {username.Length} characters; " +
+                             "AD allows a maximum of 20. Shorten the last name or create this account manually.");
                 return;
             }
 
             // -------------------------
             // Display summary
             // -------------------------
-            Console.WriteLine($"\n-----------------------------------------------------------------------------------" +
-                              $"\n{"First Name:",-20} {firstName}\n" +
-                              $"{"Last Name:",-20} {lastName}\n" +
-                              $"{"Display Name:",-20} {firstName} {lastName}\n" +
-                              $"{"Username:",-20} {username}\n" +
-                              $"{"Email Address:",-20} {email}\n" +
-                              $"{"Temp Password:",-20} {password} \n" +
-                              $"{"Department:",-20} {departmentEntry} \n" +
-                              $"{"Title:",-20} {jobTitle} \n" +
-                              $"{"Description:",-20} {description} \n" +
-                              $"{"Physical Office:",-20} {office} \n" +
-                              $"{"User Assigned OU:",-20} {targetOU} \n" +
-                              $"{"User Parent OU",-20} {_myParentOU} \n" +
-                              $"{"Script Path:",-20} logon.bat \n" +
-                              $"{"Home Drive:",-20} P: \n" +
-                              $"{"User Home Directory:",-20} {userProfile} \n" +
-                              $"{"CLS Folder Location:",-20} {clsUserFolder}\n" +
-                              $"-----------------------------------------------------------------------------------\n");
+            // Split deliberately: the temp password goes to the screen ONLY. Everything else is
+            // logged. Do not merge these back into one call -- it would write the generated
+            // password into the log files.
+            AppLog.Screen($"\n-----------------------------------------------------------------------------------" +
+                          $"\n{"First Name:",-20} {firstName}\n" +
+                          $"{"Last Name:",-20} {lastName}\n" +
+                          $"{"Display Name:",-20} {firstName} {lastName}\n" +
+                          $"{"Username:",-20} {username}\n" +
+                          $"{"Email Address:",-20} {email}");
+
+            AppLog.ScreenOnly($"{"Temp Password:",-20} {password}");                                 // never logged
+
+            AppLog.Screen($"{"Department:",-20} {departmentEntry} \n" +
+                          $"{"Title:",-20} {jobTitle} \n" +
+                          $"{"Description:",-20} {description} \n" +
+                          $"{"Physical Office:",-20} {office} \n" +
+                          $"{"User Assigned OU:",-20} {targetOU} \n" +
+                          $"{"User Parent OU",-20} {_myParentOU} \n" +
+                          $"{"Script Path:",-20} logon.bat \n" +
+                          $"{"Home Drive:",-20} P: \n" +
+                          $"{"User Home Directory:",-20} {userProfile} \n" +
+                          $"{"CLS Folder Location:",-20} {clsUserFolder}\n" +
+                          $"-----------------------------------------------------------------------------------\n");
 
             // -------------------------
             // Confirm info
             // -------------------------
             while (true)
             {
-                Console.Write($"\nPlease verify all new user information are correct !!!{"(Y/N)".Pastel(Color.MediumPurple)}: ");
+                AppLog.Prompt($"\nPlease verify all new user information are correct !!!{"(Y/N)".Pastel(Color.MediumPurple)}: ");
                 string confirmation = ConsoleInput.ReadTrimmedUpper();
                 if (confirmation == "Y")
                 {
-                    Console.WriteLine("User information has been verified. \nCreating user...\n".Pastel(Color.DarkCyan));
+                    AppLog.Info("User information has been verified. \nCreating user...\n", Color.DarkCyan);
                     break;
                 }
                 else
                 {
-                    Console.WriteLine("\nReturning to menu....".Pastel(Color.Gray));
+                    AppLog.Screen("\nReturning to menu....", Color.Gray);
                     return;
                 }
             }
@@ -706,7 +711,7 @@ namespace ADUtils
                         catch (Exception ex)
                         {
                             AppLog.Warn($"Could not flag the password for change at next logon: {ex.Message}", ex, Color.DarkGoldenrod);
-                            Console.WriteLine("Set 'User must change password at next logon' manually in ADUC.".Pastel(Color.DarkGoldenrod));
+                            AppLog.Warn("Set 'User must change password at next logon' manually in ADUC.", color: Color.DarkGoldenrod);
                         }
 
                         // GetUnderlyingObject() returns an object owned by the UserPrincipal --
@@ -742,11 +747,11 @@ namespace ADUtils
                             catch (COMException ex)
                             {
                                 AppLog.Error($"Move to '{ouPath}' FAILED: {ex.Message}", ex, Color.Crimson);
-                                Console.WriteLine($"'{username}' exists but is still in the default Users container — move it manually.".Pastel(Color.Crimson));
+                                AppLog.Warn($"'{username}' exists but is still in the default Users container — move it manually.", color: Color.Crimson);
                             }
                         }
 
-                        Console.WriteLine($"User Account '{username}' Created Successfully!!!".Pastel(Color.DarkOliveGreen));
+                        AppLog.Info($"User Account '{username}' Created Successfully!!!", Color.DarkOliveGreen);
                     }// end of UserPrincipal using
                 }// end of PrincipalContect using
 
@@ -800,16 +805,16 @@ namespace ADUtils
             }// end of if statement
             do
             {
-                Console.Write($"Have you completed the manual steps for CLS, BRP, Phone, Office 365?{"(Y/N)".Pastel(Color.MediumPurple)}\nEnter your choice: ");
+                AppLog.Prompt($"Have you completed the manual steps for CLS, BRP, Phone, Office 365?{"(Y/N)".Pastel(Color.MediumPurple)}\nEnter your choice: ");
                 string result = ConsoleInput.ReadTrimmedUpper();
                 if (result == "Y")
                 {
-                    Console.WriteLine("Manual Steps complete".Pastel(Color.DarkOliveGreen));
+                    AppLog.Info("Manual Steps complete", Color.DarkOliveGreen);
                     manualSteps = true;
                 }
                 else if (result == "N")
                 {
-                    Console.WriteLine("Manual Steps are reqired!!".Pastel(Color.DarkGoldenrod));
+                    AppLog.Warn("Manual Steps are reqired!!", color: Color.DarkGoldenrod);
                 }
             } while (!manualSteps);
 
@@ -830,7 +835,7 @@ namespace ADUtils
                     UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
                     if(user != null)
                     {
-                        Console.WriteLine($"User Account Has Been Verified: {user.DisplayName}!!!".Pastel(Color.DarkCyan));
+                        AppLog.Info($"User Account Has Been Verified: {user.DisplayName}!!!", Color.DarkCyan);
                         return true;
                     }
                     return false;
@@ -1003,20 +1008,20 @@ namespace ADUtils
                             }// end of if statement
                             else
                             {
-                                Console.WriteLine($"Group '{groupName}' not found in Active Directory.".Pastel(Color.DarkGoldenrod));
+                                AppLog.Warn($"Group '{groupName}' not found in Active Directory.", color: Color.DarkGoldenrod);
                             }
                         }// end of foreach
-                        Console.WriteLine($"User '{username}' added to groups: {string.Join(", ", groups)}!!!".Pastel(Color.DarkOliveGreen));
+                        AppLog.Info($"User '{username}' added to groups: {string.Join(", ", groups)}!!!", Color.DarkOliveGreen);
                     }// end of if-statement
                     else
                     {
-                        Console.WriteLine($"User '{username}' not found for group assignment.".Pastel(Color.IndianRed));
+                        AppLog.Warn($"User '{username}' not found for group assignment.", color: Color.IndianRed);
                     }// end of else-statement
                 }// end of using PrincipalContext
             }// end of if-statement
             else
             {
-                Console.WriteLine($"No group assignments found for the Region='{region}', Role='{role}'".Pastel(Color.IndianRed));
+                AppLog.Warn($"No group assignments found for the Region='{region}', Role='{role}'", color: Color.IndianRed);
             }// end of else-statement
         }// end of addUserToGroup
 
@@ -1034,7 +1039,7 @@ namespace ADUtils
                 try
                 {
                     Directory.CreateDirectory(directoryPath);
-                    Console.WriteLine($"CLS folder has been created in: {directoryPath}".Pastel(Color.DarkOliveGreen));
+                    AppLog.Info($"CLS folder has been created in: {directoryPath}", Color.DarkOliveGreen);
                 }// end of try
                 catch (Exception ex)
                 {
@@ -1043,7 +1048,7 @@ namespace ADUtils
             }// end of if-statement
             else
             {
-                Console.WriteLine($"CLS file already Exist for this user: {username}".Pastel(Color.DarkGoldenrod));
+                AppLog.Warn($"CLS file already Exist for this user: {username}", color: Color.DarkGoldenrod);
             }// end of else-statement
         }// end of CreateCLSFolder
 
@@ -1061,14 +1066,14 @@ namespace ADUtils
         /// </returns>
         private bool CreateExchangeMailbox(string adminUsername, string adminPassword)
         {
-            Console.WriteLine("Creating User Mailbox...".Pastel(Color.DarkCyan));
+            AppLog.Info("Creating User Mailbox...", Color.DarkCyan);
             Thread.Sleep(processSleepTimer);
 
             using (var exchange = new ExchangeSessionManager(_configuration))
             {
                 if (!exchange.Connect())
                 {
-                    Console.WriteLine($"Mailbox for '{username}' was NOT created — create it manually in Exchange.".Pastel(Color.Crimson));
+                    AppLog.Warn($"Mailbox for '{username}' was NOT created — create it manually in Exchange.", color: Color.Crimson);
                     return false;
                 }
 
@@ -1086,11 +1091,11 @@ namespace ADUtils
 
                 if (!exchange.RunCommand("Enable-Mailbox", $"enabling mailbox for '{username}'", parameters))
                 {
-                    Console.WriteLine($"Mailbox for '{username}' was NOT created — create it manually in Exchange.".Pastel(Color.Crimson));
+                    AppLog.Warn($"Mailbox for '{username}' was NOT created — create it manually in Exchange.", color: Color.Crimson);
                     return false;
                 }
 
-                Console.WriteLine($"Mailbox for '{username}' created successfully!!".Pastel(Color.DarkOliveGreen));
+                AppLog.Info($"Mailbox for '{username}' created successfully!!", Color.DarkOliveGreen);
                 return true;
             }// end of using
         }// end of CreateExhangeMailbox
@@ -1099,7 +1104,7 @@ namespace ADUtils
         /// </summary>
         private void LaunchBRPMgr()
         {
-            Console.WriteLine($"Please create account in BRPMgr for the new user MANUALLY!!!\nOpening BRP manager...");
+            AppLog.Screen($"Please create account in BRPMgr for the new user MANUALLY!!!\nOpening BRP manager...");
             Thread.Sleep(processSleepTimer);
             ProcessStartInfo startInfo = new ProcessStartInfo();                                                                                    // Create a new process start info
             startInfo.FileName = @"F:\Imaging\BRPUserMgr.exe";                                                                                      // Set the file name to the path of the executable
@@ -1118,7 +1123,7 @@ namespace ADUtils
         /// </summary>
         private void LaunchVLMMgr()
         {
-            Console.WriteLine($"Please add a CLS license to the new user MANUALLY!!!\nOpening VLM...");
+            AppLog.Screen($"Please add a CLS license to the new user MANUALLY!!!\nOpening VLM...");
             Thread.Sleep(processSleepTimer);
 
             ProcessStartInfo startInfo = new ProcessStartInfo();                                                                                    // Create a new process start info
@@ -1138,7 +1143,7 @@ namespace ADUtils
         /// </summary>
         private void LaunchPhoneSystemSite()
         {
-            Console.WriteLine($"Please Add a extension to the new user MANUALLY!!!\nOpening HostMyCalls Site...");
+            AppLog.Screen($"Please Add a extension to the new user MANUALLY!!!\nOpening HostMyCalls Site...");
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo
@@ -1158,7 +1163,7 @@ namespace ADUtils
         /// </summary>
         private void LaunchO365Site()
         {
-            Console.WriteLine($"Please Add a O365 licnese to the new user MANUALLY!!!\nOpening Microsoft Office Site...");
+            AppLog.Screen($"Please Add a O365 licnese to the new user MANUALLY!!!\nOpening Microsoft Office Site...");
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo
@@ -1177,10 +1182,10 @@ namespace ADUtils
         {
             foreach (char c in line)
             {
-                Console.Write(c);
+                Console.Write(c);                                                                    // character-by-character animation; logging each char would be noise
                 Thread.Sleep(10); // Adjust delay for speed of animation
             }
-            Console.WriteLine();
+            AppLog.Blank();
         }
         private void CheckManagerDN()
         {
@@ -1199,7 +1204,7 @@ namespace ADUtils
                 if (string.IsNullOrEmpty(managerDN))
                     throw new InvalidOperationException($"Could not retrieve DN for manager '{manager}'.");
 
-                Console.WriteLine($"Manager found: {managerPrincipal.DisplayName} (DN: {managerDN})".Pastel(Color.DarkCyan));
+                AppLog.Info($"Manager found: {managerPrincipal.DisplayName} (DN: {managerDN})", Color.DarkCyan);
             }
         }// end of CheckManagerDN
     }// end of class

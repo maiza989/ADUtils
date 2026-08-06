@@ -24,9 +24,9 @@ class Program
     static void GetAdminCreditials()
     {
 
-        Console.Write("Enter admin username: ");
+        AppLog.Prompt("Enter admin username: ");
         adminUsername = ConsoleInput.ReadTrimmed();
-        Console.Write("Enter admin password: ");
+        AppLog.Prompt("Enter admin password: ");
         adminPassword = PasswordManager.GetPassword().Trim();
     }
 
@@ -42,10 +42,10 @@ class Program
         }
         catch (FileNotFoundException)
         {
-            Console.WriteLine("Appsettings.json was not found.".Pastel(Color.IndianRed));
-            Console.WriteLine($"Copy {"Appsettings.example.json".Pastel(Color.MediumPurple)} to " +
-                              $"{"Appsettings.json".Pastel(Color.MediumPurple)} in {AppContext.BaseDirectory} " +
-                              "and fill in your domain, Exchange and SMTP values.");
+            AppLog.Error("Appsettings.json was not found.");
+            AppLog.Screen($"Copy {"Appsettings.example.json".Pastel(Color.MediumPurple)} to " +
+                          $"{"Appsettings.json".Pastel(Color.MediumPurple)} in {AppContext.BaseDirectory} " +
+                          "and fill in your domain, Exchange and SMTP values.");
             return;
         }
         catch (Exception ex)
@@ -63,10 +63,10 @@ class Program
 
         string _myDomainName = configuration["AccountCreationSettings:myDomainName"];
 
-        Console.WriteLine("Starting Active Directory Manager...");
+        AppLog.Screen("Starting Active Directory Manager...");
         if (AuditLogManager.VerifyLoggingConfigured())
         {
-            Console.WriteLine($"Logs: {AuditLogManager.LogDirectory}".Pastel(Color.DarkGray));
+            AppLog.Screen($"Logs: {AuditLogManager.LogDirectory}", Color.DarkGray);
         }
 
         try
@@ -84,7 +84,7 @@ class Program
                     {
 
                         isAuthenticated = true;
-                        Console.WriteLine($"Connected to Active Directory as: {context.UserName}.".Pastel(Color.GreenYellow));
+                        AppLog.Info($"Connected to Active Directory as: {context.UserName}.", Color.GreenYellow);
 
                         auditLogManager = new AuditLogManager(adminUsername, configuration);
                         ADGroupManager = new ADGroupActionManager(auditLogManager);
@@ -137,13 +137,12 @@ class Program
     static void DisplayMainMenu()
     {
 
-        Console.ForegroundColor = ConsoleColor.Gray;
-        Console.WriteLine("\nSelect an option:");
-        Console.WriteLine("1. Locked Out Management");
-        Console.WriteLine("2. Group Management");
-        Console.WriteLine("3. User Information Management");
-        Console.WriteLine("4. Exit");
-        Console.Write("Enter your choice: ");
+        AppLog.Screen("\nSelect an option:");
+        AppLog.Screen("1. Locked Out Management");
+        AppLog.Screen("2. Group Management");
+        AppLog.Screen("3. User Information Management");
+        AppLog.Screen("4. Exit");
+        AppLog.Prompt("Enter your choice: ");
     }// end of DisplayMainMenu
 
     /// <summary>
@@ -174,7 +173,7 @@ class Program
                 Console.Clear();
                 break;
             default:
-                Console.WriteLine("Invalid option. Please try again.".Pastel(Color.IndianRed));
+                AppLog.Warn("Invalid option. Please try again.", color: Color.IndianRed);
                 break;
         }// end of switch case
         return false;
@@ -190,13 +189,12 @@ class Program
         bool exit = false;
         while (!exit)
         {
-            Console.ForegroundColor = ConsoleColor.Gray;
-            Console.WriteLine("\nLocked Out Manager:");
-            Console.WriteLine("1. Unlock a Specific User");
-            Console.WriteLine("2. Check All Locked Accounts");
-            Console.WriteLine("3. Unlock All Locked Accounts");
-            Console.WriteLine("4. Find Lockout Source for a User");
-            Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
+            AppLog.Screen("\nLocked Out Manager:");
+            AppLog.Screen("1. Unlock a Specific User");
+            AppLog.Screen("2. Check All Locked Accounts");
+            AppLog.Screen("3. Unlock All Locked Accounts");
+            AppLog.Screen("4. Find Lockout Source for a User");
+            AppLog.Prompt($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
             string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
             {
@@ -216,7 +214,7 @@ class Program
                     exit = true;
                     break;
                 default:
-                    Console.WriteLine("Invalid option. Please try again.".Pastel(Color.IndianRed));
+                    AppLog.Warn("Invalid option. Please try again.", color: Color.IndianRed);
                     break;
             }// end of switch-case
         }// end of while
@@ -233,15 +231,14 @@ class Program
         bool exit = false;
         while (!exit)
         {
-            Console.ForegroundColor = ConsoleColor.Gray;
-            Console.WriteLine("\nGroup Management:");
-            Console.WriteLine("1. List All Groups in Active Directory");
-            Console.WriteLine("2. Add User to a Group");
-            Console.WriteLine("3. Remove User From a Group");
-            Console.WriteLine("4. Add User to a Shared Mailbox");
-            Console.WriteLine("5. Remove User From a Shared Mailbox");
-            Console.WriteLine("6. Check Who is Member in a Group");
-            Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
+            AppLog.Screen("\nGroup Management:");
+            AppLog.Screen("1. List All Groups in Active Directory");
+            AppLog.Screen("2. Add User to a Group");
+            AppLog.Screen("3. Remove User From a Group");
+            AppLog.Screen("4. Add User to a Shared Mailbox");
+            AppLog.Screen("5. Remove User From a Shared Mailbox");
+            AppLog.Screen("6. Check Who is Member in a Group");
+            AppLog.Prompt($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
 
             string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
@@ -268,7 +265,7 @@ class Program
                     exit = true;
                     break;
                 default:
-                    Console.WriteLine("Invalid option. Please try again.".Pastel(Color.IndianRed));
+                    AppLog.Warn("Invalid option. Please try again.", color: Color.IndianRed);
                     break;
             }// end of switch-case
         }// end of while loop
@@ -286,14 +283,13 @@ class Program
         bool exit = false;
         while (!exit)
         {
-            Console.ForegroundColor = ConsoleColor.Gray;
-            Console.WriteLine("\nUser Information:");
-            Console.WriteLine("1. Check User Password Expiration Date");
-            Console.WriteLine("2. Display General User Info");
-            Console.WriteLine("3. Reset A User Password");
-            Console.WriteLine("4. Create New User Account");
-            Console.WriteLine("5. Disable User Account");
-            Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
+            AppLog.Screen("\nUser Information:");
+            AppLog.Screen("1. Check User Password Expiration Date");
+            AppLog.Screen("2. Display General User Info");
+            AppLog.Screen("3. Reset A User Password");
+            AppLog.Screen("4. Create New User Account");
+            AppLog.Screen("5. Disable User Account");
+            AppLog.Prompt($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
 
             string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
@@ -317,7 +313,7 @@ class Program
                     exit = true;
                     break;
                 default:
-                    Console.WriteLine("Invalid option. Please try again.".Pastel(Color.IndianRed));
+                    AppLog.Warn("Invalid option. Please try again.", color: Color.IndianRed);
                     break;
             }// end of switch-case
         }// end of while loop

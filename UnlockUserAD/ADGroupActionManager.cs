@@ -30,20 +30,20 @@ namespace ADUtils
 
             do
             {
-                Console.Write($"Enter the username(Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                AppLog.Prompt($"Enter the username(Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
                 string username = ConsoleInput.ReadTrimmed();
                 if (username.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    Console.WriteLine($"\nReturning to menu...");
+                    AppLog.Screen($"\nReturning to menu...");
                     break;
                 }
-                Console.Write($"Enter the group name (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                AppLog.Prompt($"Enter the group name (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
                 string groupName = ConsoleInput.ReadTrimmed();
                 if (groupName.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    Console.WriteLine($"\nReturning to menu...");
+                    AppLog.Screen($"\nReturning to menu...");
                     break;
                 }
                 else
@@ -64,7 +64,7 @@ namespace ADUtils
                                     {
                                         group.Members.Add(user);                                                                                                       // Add the user to the group
                                         group.Save(context);                                                                                                           // Apply changes
-                                        Console.WriteLine($"User '{username}' added to group '{groupName}' successfully.".Pastel(Color.LimeGreen));
+                                        AppLog.Info($"User '{username}' added to group '{groupName}' successfully.", Color.LimeGreen);
 
                                         string logEntry = ($"\"{user.DisplayName}\" has been Added to \"{groupName}\" group in Active Directory\n");
                                         emailActionLog.Add(logEntry);
@@ -72,18 +72,18 @@ namespace ADUtils
                                     }// end of inner-2 if-statement
                                     else
                                     {
-                                        Console.WriteLine($"User '{username}' is already a member of group '{groupName}'.".Pastel(Color.DarkGoldenrod));
+                                        AppLog.Warn($"User '{username}' is already a member of group '{groupName}'.", color: Color.DarkGoldenrod);
                                     }// end of inner-2 else-statement
                                 }// end of using
                             }// end of inner if-statement
                             else
                             {
-                                Console.WriteLine($"Group '{groupName}' not found in Active Directory.".Pastel(Color.IndianRed));
+                                AppLog.Warn($"Group '{groupName}' not found in Active Directory.", color: Color.IndianRed);
                             }// end of outter else-statement
                         }// end of outter if-statement
                         else
                         {
-                            Console.WriteLine($"User '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
+                            AppLog.Warn($"User '{username}' not found in Active Directory.", color: Color.IndianRed);
                         }
                     }// end of try
                     catch (Exception ex)
@@ -107,20 +107,20 @@ namespace ADUtils
 
             do
             {
-                Console.Write($"Enter the username(Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                AppLog.Prompt($"Enter the username(Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
                 string username = ConsoleInput.ReadTrimmed();
                 if (username.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    Console.WriteLine($"\nReturning to menu...");
+                    AppLog.Screen($"\nReturning to menu...");
                     break;
                 }
-                Console.Write($"Enter the group name (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                AppLog.Prompt($"Enter the group name (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
                 string groupName = ConsoleInput.ReadTrimmed();
                 if (groupName.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    Console.WriteLine($"\nReturning to menu...");
+                    AppLog.Screen($"\nReturning to menu...");
                     break;
                 }
                 else
@@ -141,7 +141,7 @@ namespace ADUtils
                                     {
                                         group.Members.Remove(user);
                                         group.Save();                                                                                                                 // Apply changes
-                                        Console.WriteLine($"User '{username}' removed from group '{groupName}' successfully.".Pastel(Color.LimeGreen));
+                                        AppLog.Info($"User '{username}' removed from group '{groupName}' successfully.", Color.LimeGreen);
 
                                         string logEntry = ($"\"{user.DisplayName}\" has been removed from \"{groupName}\" group in Active Directory\n");
                                         emailActionLog.Add(logEntry);
@@ -149,18 +149,18 @@ namespace ADUtils
                                     }// end of inner-2 if-statement
                                     else
                                     {
-                                        Console.WriteLine($"User '{username}' is not a member of group '{groupName}'.".Pastel(Color.DarkGoldenrod));
+                                        AppLog.Warn($"User '{username}' is not a member of group '{groupName}'.", color: Color.DarkGoldenrod);
                                     }// end of inner-2 else-statement
                                 }// end of using
                             }// end of inner if-statement
                             else
                             {
-                                Console.WriteLine($"Group '{groupName}' not found in Active Directory.".Pastel(Color.IndianRed));
+                                AppLog.Warn($"Group '{groupName}' not found in Active Directory.", color: Color.IndianRed);
                             }// end of outter else-statement
                         }// end of outter if-statement
                         else
                         {
-                            Console.WriteLine($"User '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
+                            AppLog.Warn($"User '{username}' not found in Active Directory.", color: Color.IndianRed);
                         }
                     }// end of try
                     catch (Exception ex)
@@ -205,27 +205,27 @@ namespace ADUtils
 
             do
             {
-                Console.Write($"Enter the username to {verb} access for (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                AppLog.Prompt($"Enter the username to {verb} access for (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
                 string username = ConsoleInput.ReadTrimmed();
                 if (username.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    Console.WriteLine("\nReturning to menu...");
+                    AppLog.Screen("\nReturning to menu...");
                     break;
                 }// end of if statement
 
-                Console.Write($"Enter the shared mailbox email or alias (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                AppLog.Prompt($"Enter the shared mailbox email or alias (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
                 string sharedMailbox = ConsoleInput.ReadTrimmed();
                 if (sharedMailbox.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    Console.WriteLine("\nReturning to menu...");
+                    AppLog.Screen("\nReturning to menu...");
                     break;
                 }// end of if statement
 
                 if (username.Length == 0 || sharedMailbox.Length == 0)
                 {
-                    Console.WriteLine("Both a username and a shared mailbox are required.".Pastel(Color.DarkGoldenrod));
+                    AppLog.Warn("Both a username and a shared mailbox are required.", color: Color.DarkGoldenrod);
                     continue;
                 }
 
@@ -236,7 +236,7 @@ namespace ADUtils
                     UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
                     if (user == null)
                     {
-                        Console.WriteLine($"User '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
+                        AppLog.Warn($"User '{username}' not found in Active Directory.", color: Color.IndianRed);
                         continue;
                     }
 
@@ -244,7 +244,7 @@ namespace ADUtils
                     {
                         if (!exchange.Connect())
                         {
-                            Console.WriteLine($"Could not {verb} access — no Exchange session.".Pastel(Color.IndianRed));
+                            AppLog.Warn($"Could not {verb} access — no Exchange session.", color: Color.IndianRed);
                             continue;
                         }
 
@@ -293,7 +293,7 @@ namespace ADUtils
 
                         if (!fullAccessOk && !sendAsOk)
                         {
-                            Console.WriteLine($"Nothing was changed for '{username}' on '{sharedMailbox}'.".Pastel(Color.IndianRed));
+                            AppLog.Warn($"Nothing was changed for '{username}' on '{sharedMailbox}'.", color: Color.IndianRed);
                             continue;
                         }
 
@@ -304,12 +304,12 @@ namespace ADUtils
 
                         string direction = granting ? "granted" : "revoked";
                         string preposition = granting ? "on" : "from";
-                        Console.WriteLine($"{string.Join(" and ", changed)} {direction} for '{username}' {preposition} '{sharedMailbox}'.".Pastel(Color.LimeGreen));
+                        AppLog.Info($"{string.Join(" and ", changed)} {direction} for '{username}' {preposition} '{sharedMailbox}'.", Color.LimeGreen);
 
                         if (!fullAccessOk || !sendAsOk)
                         {
                             string missing = fullAccessOk ? "Send As" : "FullAccess";
-                            Console.WriteLine($"{missing} was NOT {direction} — apply it manually in Exchange.".Pastel(Color.DarkGoldenrod));
+                            AppLog.Warn($"{missing} was NOT {direction} — apply it manually in Exchange.", color: Color.DarkGoldenrod);
                         }
 
                         string logEntry = $"\"{username}\" — {string.Join(" and ", changed)} {direction} {preposition} shared mailbox \"{sharedMailbox}\" in Exchange\n";
@@ -332,13 +332,13 @@ namespace ADUtils
         /// <param name="context"></param>
         public void ListAllGroups(PrincipalContext context)
         {
-            Console.WriteLine("\nList of all groups:");
+            AppLog.Screen("\nList of all groups:");
 
             try
             {
-                Console.Write($"Enter the {"first letter".Pastel(Color.MediumPurple)} of the group name to filter by (or press Enter to show all groups): ");
+                AppLog.Prompt($"Enter the {"first letter".Pastel(Color.MediumPurple)} of the group name to filter by (or press Enter to show all groups): ");
                 char filterLetter = Console.ReadKey().KeyChar;
-                Console.WriteLine();
+                AppLog.Blank();
 
                 List<string> groupNames = new List<string>();
                 using (PrincipalSearcher searcher = new PrincipalSearcher(new GroupPrincipal(context)))                                                               // Search for all groups
@@ -362,9 +362,9 @@ namespace ADUtils
                 if (groupNames.Count == 0)
                 {
                     // Previously Max() on an empty list threw "Sequence contains no elements" here.
-                    Console.WriteLine(filterLetter == '\r'
-                        ? "No groups found in Active Directory.".Pastel(Color.DarkGoldenrod)
-                        : $"No groups start with '{filterLetter}'.".Pastel(Color.DarkGoldenrod));
+                    AppLog.Warn(filterLetter == '\r'
+                        ? "No groups found in Active Directory."
+                        : $"No groups start with '{filterLetter}'.");
                     return;
                 }
 
@@ -386,12 +386,12 @@ namespace ADUtils
             bool isExit = false;
             do
             {
-                Console.Write($"Enter the group name (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                AppLog.Prompt($"Enter the group name (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
                 string groupName = ConsoleInput.ReadTrimmed();
                 if (groupName.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    Console.WriteLine("\nReturning to menu...");
+                    AppLog.Screen("\nReturning to menu...");
                     break;
                 }
                 else
@@ -404,7 +404,7 @@ namespace ADUtils
                         {
                             using (group)
                             {
-                                Console.WriteLine($"\nMembers of group '{groupName}':");
+                                AppLog.Screen($"\nMembers of group '{groupName}':");
 
                                 List<string> memberNames = new List<string>();
                                 foreach (var member in group.GetMembers())
@@ -422,13 +422,13 @@ namespace ADUtils
                                 }// end of if-statement
                                 else
                                 {
-                                    Console.WriteLine("No members found in this group.");
+                                    AppLog.Screen("No members found in this group.");
                                 }// end of else-statement
                             }// end of using
                         }// end of if-statements
                         else
                         {
-                            Console.WriteLine($"Group '{groupName}' not found in Active Directory.".Pastel(Color.IndianRed));
+                            AppLog.Warn($"Group '{groupName}' not found in Active Directory.", color: Color.IndianRed);
                         }// end of else
                     }// end of try-catch
                     catch (Exception ex)
@@ -463,17 +463,20 @@ namespace ADUtils
             int numColumns = Math.Max(1, windowWidth / columnWidth);                                                                                                 // Never 0 — see remarks
             int numRows = (int)Math.Ceiling((double)names.Count / numColumns);
 
+            // Build each row then emit it in one go, so the log records one line per row rather
+            // than one entry per cell.
             for (int i = 0; i < numRows; i++)                                                                                                                        // Nested for loop to print names in a grid style
             {
+                var row = new System.Text.StringBuilder();
                 for (int j = 0; j < numColumns; j++)
                 {
                     int index = i + j * numRows;                                                                                                                     // Calculate the index based on 'i' rows and 'j' columns
                     if (index < names.Count)
                     {
-                        Console.Write($"- {names[index].PadRight(columnWidth)}");                                                                                     // Print each name with specified right padding
+                        row.Append($"- {names[index].PadRight(columnWidth)}");                                                                                        // Each name with specified right padding
                     }
                 }// end of inner for loop
-                Console.WriteLine();
+                AppLog.Screen(row.ToString().TrimEnd());
             }// end of outter for loop
         }// end of PrintInColumns
 

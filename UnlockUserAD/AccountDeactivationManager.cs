@@ -29,7 +29,7 @@ namespace ADUtils
 
             do
             {
-                Console.Write($"Enter the username to deactivate (type {"'exit'".Pastel(Color.MediumPurple)} to return to the main menu): ");
+                AppLog.Prompt($"Enter the username to deactivate (type {"'exit'".Pastel(Color.MediumPurple)} to return to the main menu): ");
                 string username = ConsoleInput.ReadTrimmedLower();
 
                 if (username == "exit")
@@ -38,7 +38,7 @@ namespace ADUtils
                 }// end of if statement
                 else if (username.Length == 0)
                 {
-                    Console.WriteLine("Enter a username, or 'exit' to return to the menu.".Pastel(Color.DarkGoldenrod));
+                    AppLog.Warn("Enter a username, or 'exit' to return to the menu.", color: Color.DarkGoldenrod);
                 }
                 else
                 {
@@ -47,7 +47,7 @@ namespace ADUtils
                         UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);              // Search for specific user using username
                         if (user == null)
                         {
-                            Console.WriteLine($"\tUser account '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
+                            AppLog.Warn($"\tUser account '{username}' not found in Active Directory.", color: Color.IndianRed);
                             continue;
                         }
 
@@ -56,7 +56,7 @@ namespace ADUtils
                         // stripped it again and still printed a success line.
                         if (user.Enabled != true)
                         {
-                            Console.WriteLine($"User account '{username}' is {"ALREADY".Pastel(Color.MediumPurple)} disabled — no changes made.".Pastel(Color.DarkGoldenrod));
+                            AppLog.Warn($"User account '{username}' is {"ALREADY".Pastel(Color.MediumPurple)} disabled — no changes made.", color: Color.DarkGoldenrod);
                             continue;
                         }
 
@@ -79,12 +79,12 @@ namespace ADUtils
                                 AppLog.Warn($"Could not remove '{username}' from '{group.Name}': {ex.Message}", ex, Color.DarkGoldenrod);
                             }
                         }// end of foreach
-                        Console.WriteLine($"User account '{username}' removed from {removed} group(s); 'Domain Users' kept.".Pastel(Color.LimeGreen));
+                        AppLog.Info($"User account '{username}' removed from {removed} group(s); 'Domain Users' kept.", Color.LimeGreen);
 
                         user.Enabled = false;                                                                                   // Disabling the user account
                         user.Description = $"Delete on {deletionDateString}";                                                   // Change description with reminder of when to delete the ex user account
                         user.Save();
-                        Console.WriteLine($"User account '{username}' has been disabled\nAccount description changed to 'Delete on {deletionDateString}'".Pastel(Color.LimeGreen));
+                        AppLog.Info($"User account '{username}' has been disabled\nAccount description changed to 'Delete on {deletionDateString}'", Color.LimeGreen);
 
                         // GetUnderlyingObject() is owned by the UserPrincipal -- don't dispose it.
                         DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject();
@@ -98,12 +98,12 @@ namespace ADUtils
                             {
                                 startOU.MoveTo(endOU);
                                 moved = true;
-                                Console.WriteLine($"User account '{username}' has been moved to the {ACManager._myExEmployeeOU} OU".Pastel(Color.LimeGreen));
+                                AppLog.Info($"User account '{username}' has been moved to the {ACManager._myExEmployeeOU} OU", Color.LimeGreen);
                             }
                             catch (Exception ex)
                             {
                                 AppLog.Error($"Move to '{ouPath}' FAILED: {ex.Message}", ex, Color.Crimson);
-                                Console.WriteLine($"'{username}' is disabled but was NOT moved — move it manually.".Pastel(Color.Crimson));
+                                AppLog.Warn($"'{username}' is disabled but was NOT moved — move it manually.", color: Color.Crimson);
                             }
                         }// end of using
 

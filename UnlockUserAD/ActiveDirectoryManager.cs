@@ -54,7 +54,7 @@ namespace ADUtils
                                               .ToList();
 
             if (_domainControllers.Count == 0)
-                Console.WriteLine("Warning: No domain controllers configured in Appsettings.json.".Pastel(Color.DarkGoldenrod));
+                AppLog.Warn("Warning: No domain controllers configured in Appsettings.json.", color: Color.DarkGoldenrod);
         }// end of SetAdminCredentials
 
         /// <summary>
@@ -67,7 +67,7 @@ namespace ADUtils
             List<string> userGroups = new List<string>();
             do
             {
-                Console.Write($"Enter the username to display info about (Type {"'exit'".Pastel(Color.MediumPurple)} to return to the main menu): ");
+                AppLog.Prompt($"Enter the username to display info about (Type {"'exit'".Pastel(Color.MediumPurple)} to return to the main menu): ");
                 string username = ConsoleInput.ReadTrimmedLower();
 
                 if (username == "exit")
@@ -76,7 +76,7 @@ namespace ADUtils
                 }// end of if statement
                 else if (username.Length == 0)
                 {
-                    Console.WriteLine("Enter a username, or 'exit' to return to the main menu.".Pastel(Color.DarkGoldenrod));
+                    AppLog.Warn("Enter a username, or 'exit' to return to the main menu.", color: Color.DarkGoldenrod);
                 }
                 else
                 {
@@ -114,7 +114,7 @@ namespace ADUtils
                                 ? TimeZoneInfo.ConvertTimeFromUtc(user.LastLogon.Value.ToUniversalTime(), TimeZoneInfo.Local).ToString()
                                 : "N/A";
 
-                            Console.WriteLine($"\nFirst name: {user.GivenName ?? "N/A"}\n" +
+                            AppLog.Screen($"\nFirst name: {user.GivenName ?? "N/A"}\n" +
                                               $"Last name: {user.Surname ?? "N/A"}\n" +
                                               $"Display name: {user.DisplayName ?? "N/A"}\n" +
                                               $"Username: {user.SamAccountName ?? "N/A"}\n" +
@@ -136,7 +136,7 @@ namespace ADUtils
                         else
                         {
                             // Previously this branch was missing entirely, so a typo printed nothing.
-                            Console.WriteLine($"\tUser '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
+                            AppLog.Warn($"\tUser '{username}' not found in Active Directory.", color: Color.IndianRed);
                         }// end of else statement
                     }// end of try
                     catch (Exception ex)
@@ -156,7 +156,7 @@ namespace ADUtils
             bool returnToMenu = false;
             do
             {
-                Console.Write($"Enter the username to unlock (type {"'exit'".Pastel(Color.MediumPurple)} to return to the main menu): ");
+                AppLog.Prompt($"Enter the username to unlock (type {"'exit'".Pastel(Color.MediumPurple)} to return to the main menu): ");
                 string username = ConsoleInput.ReadTrimmedLower();
 
                 if (username.ToLower().Trim() == "exit")
@@ -173,16 +173,16 @@ namespace ADUtils
                             if (user.IsAccountLockedOut())                                                                                           // Check if the user is locked
                             {
                                 user.UnlockAccount();                                                                                                // Unlock user
-                                Console.WriteLine($"\tUser account '{username}' has been unlocked.".Pastel(Color.LimeGreen));
+                                AppLog.Info($"\tUser account '{username}' has been unlocked.", Color.LimeGreen);
                             }// end of inner-if-statement
                             else
                             {
-                                Console.WriteLine($"\tUser account '{username}' is not locked.".Pastel(Color.OrangeRed));
+                                AppLog.Screen($"\tUser account '{username}' is not locked.", Color.OrangeRed);
                             }// end of else-statement
                         }// end of Outter-if-statement
                         else
                         {
-                            Console.WriteLine($"\tUser account '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
+                            AppLog.Warn($"\tUser account '{username}' not found in Active Directory.", color: Color.IndianRed);
                         }// end of else-statement
                     }// end of Try-Catch
                     catch (Exception ex)
@@ -201,7 +201,7 @@ namespace ADUtils
         {
             try
             {
-                Console.WriteLine("\nUnlocking all user accounts...");
+                AppLog.Screen("\nUnlocking all user accounts...");
                 bool anyUnlocked = false;
                 using (PrincipalSearcher searcher = new PrincipalSearcher(new UserPrincipal(context) { Enabled = true }))
                 using (var results = searcher.FindAll())
@@ -216,7 +216,7 @@ namespace ADUtils
                             try
                             {
                                 user.UnlockAccount();
-                                Console.WriteLine($"\t[{DateTime.Now:MM-dd-yyyy HH:mm:ss tt}]: User account '{user.SamAccountName}' has been unlocked.".Pastel(Color.LimeGreen));
+                                AppLog.Info($"\t[{DateTime.Now:MM-dd-yyyy HH:mm:ss tt}]: User account '{user.SamAccountName}' has been unlocked.", Color.LimeGreen);
                                 anyUnlocked = true;
                             }
                             catch (Exception ex)
@@ -230,11 +230,11 @@ namespace ADUtils
                 }
                 if (!anyUnlocked)                                                                                                              // If-Else statement to check if any user were unlocked and print appropriate response.
                 {
-                    Console.WriteLine("\tNo user accounts were locked.".Pastel(Color.DarkGoldenrod));
+                    AppLog.Warn("\tNo user accounts were locked.", color: Color.DarkGoldenrod);
                 }// end of if-statement
                 else
                 {
-                    Console.WriteLine("\nAll user accounts have been unlocked successfully.".Pastel(Color.DarkCyan));
+                    AppLog.Info("\nAll user accounts have been unlocked successfully.", Color.DarkCyan);
                 }// end of else-statement
             }// end of Try-Catch
             catch (Exception ex)
@@ -374,7 +374,7 @@ namespace ADUtils
         /// <param name="context">Based in what the computer domain</param>
         public void CheckLockedAccounts(PrincipalContext context)
         {
-            Console.WriteLine("\nLocked user accounts:");
+            AppLog.Screen("\nLocked user accounts:");
             try
             {
                 // Collect the locked accounts first, so the event logs are only queried when
@@ -398,7 +398,7 @@ namespace ADUtils
 
                 if (lockedUsers.Count == 0)
                 {
-                    Console.WriteLine($"\tNo accounts are LOCKED!!! YAY!!!.".Pastel(Color.RoyalBlue));
+                    AppLog.Screen($"\tNo accounts are LOCKED!!! YAY!!!.", Color.RoyalBlue);
                     return;
                 }
 
@@ -412,10 +412,10 @@ namespace ADUtils
                     // Printed for every locked account. This line used to sit inside the
                     // "lockoutTime exists" branch, so accounts without a readable lockoutTime were
                     // counted as locked but never displayed.
-                    Console.WriteLine($"\t[{when}] - {locked.SamAccountName}".Pastel(Color.Crimson));
+                    AppLog.Warn($"\t[{when}] - {locked.SamAccountName}", color: Color.Crimson);
                 }// end of foreach
 
-                Console.WriteLine($"\n\t{lockedUsers.Count} locked account(s). Use {"'Find Lockout Source'".Pastel(Color.MediumPurple)} to see which machine locked one.".Pastel(Color.Gray));
+                AppLog.Screen($"\n\t{lockedUsers.Count} locked account(s). Use {"'Find Lockout Source'".Pastel(Color.MediumPurple)} to see which machine locked one.", Color.Gray);
             }// end of try-catch
             catch (Exception ex)
             {
@@ -463,7 +463,7 @@ namespace ADUtils
             bool returnToMenu = false;
             do
             {
-                Console.Write($"Enter the username to trace the lockout for (Type {"'exit'".Pastel(Color.MediumPurple)} to return to the menu): ");
+                AppLog.Prompt($"Enter the username to trace the lockout for (Type {"'exit'".Pastel(Color.MediumPurple)} to return to the menu): ");
                 string username = ConsoleInput.ReadTrimmed();
 
                 if (username.Equals("exit", StringComparison.OrdinalIgnoreCase))
@@ -472,19 +472,24 @@ namespace ADUtils
                 }
                 else if (username.Length == 0)
                 {
-                    Console.WriteLine("Enter a username, or 'exit' to return to the menu.".Pastel(Color.DarkGoldenrod));
+                    AppLog.Warn("Enter a username, or 'exit' to return to the menu.", color: Color.DarkGoldenrod);
                 }
                 else if (username.IndexOfAny(new[] { '\'', '"', '[', ']', '(', ')', '\\', '/' }) >= 0)
                 {
                     // The name is interpolated into an XPath predicate below.
-                    Console.WriteLine("That is not a valid sAMAccountName.".Pastel(Color.IndianRed));
+                    AppLog.Warn("That is not a valid sAMAccountName.", color: Color.IndianRed);
                 }
                 else
                 {
                     string source = LookupLockoutSource(username);
-                    Console.WriteLine(source != null
-                        ? $"\t'{username}' was locked out from: {source.Pastel(Color.Gold)}".Pastel(Color.LimeGreen)
-                        : $"\tNo lockout source found for '{username}'.".Pastel(Color.DarkGoldenrod));
+                    if (source != null)
+                    {
+                        AppLog.Info($"\t'{username}' was locked out from: {source.Pastel(Color.Gold)}", Color.LimeGreen);
+                    }
+                    else
+                    {
+                        AppLog.Warn($"\tNo lockout source found for '{username}'.");
+                    }
                 }
             } while (!returnToMenu);
         }// end of FindLockoutSource
@@ -510,14 +515,14 @@ namespace ADUtils
 
             if (string.IsNullOrEmpty(_adminUsername) || string.IsNullOrEmpty(_adminPassword))
             {
-                Console.WriteLine("Admin credentials not set — cannot read the Security log.".Pastel(Color.DarkGoldenrod));
+                AppLog.Warn("Admin credentials not set — cannot read the Security log.", color: Color.DarkGoldenrod);
                 return null;
             }
 
             var candidates = BuildDomainControllerSearchOrder();
             if (candidates.Count == 0)
             {
-                Console.WriteLine("No domain controllers configured in Appsettings.json.".Pastel(Color.DarkGoldenrod));
+                AppLog.Warn("No domain controllers configured in Appsettings.json.", color: Color.DarkGoldenrod);
                 return null;
             }
 
@@ -538,12 +543,12 @@ namespace ADUtils
             {
                 if (!IsRpcPortOpen(dc))
                 {
-                    Console.WriteLine($"\t{dc}: not reachable — skipped.".Pastel(Color.DarkGray));
+                    AppLog.Screen($"\t{dc}: not reachable — skipped.", Color.DarkGray);
                     continue;
                 }
 
                 anyReachable = true;
-                Console.Write($"\t{dc}: ");
+                AppLog.Prompt($"\t{dc}: ");
 
                 string caller = null;
                 string failure = null;
@@ -609,7 +614,7 @@ namespace ADUtils
 
                 if (!probe.Wait(TimeSpan.FromSeconds(LockoutLookupTimeoutSeconds)))
                 {
-                    Console.WriteLine($"gave up after {LockoutLookupTimeoutSeconds}s.".Pastel(Color.DarkGoldenrod));
+                    AppLog.Warn($"gave up after {LockoutLookupTimeoutSeconds}s.", color: Color.DarkGoldenrod);
                     _eventLogBlocked = true;
                     PrintEventLogBlockedHelp();
                     return null;
@@ -617,22 +622,22 @@ namespace ADUtils
 
                 if (caller != null)
                 {
-                    Console.WriteLine($"found ({foundAt:MM-dd-yyyy HH:mm:ss}).".Pastel(Color.DarkOliveGreen));
+                    AppLog.Info($"found ({foundAt:MM-dd-yyyy HH:mm:ss}).", Color.DarkOliveGreen);
                     return caller;
                 }
                 if (rpcBlocked)
                 {
-                    Console.WriteLine("remote Security log is blocked.".Pastel(Color.DarkGoldenrod));
+                    AppLog.Warn("remote Security log is blocked.", color: Color.DarkGoldenrod);
                     _eventLogBlocked = true;
                     PrintEventLogBlockedHelp();
                     return null;
                 }
-                Console.WriteLine(failure.Pastel(Color.DarkGray));
+                AppLog.Screen(failure, Color.DarkGray);
             }
 
             if (!anyReachable)
             {
-                Console.WriteLine("\tNone of the configured domain controllers are reachable.".Pastel(Color.IndianRed));
+                AppLog.Warn("\tNone of the configured domain controllers are reachable.", color: Color.IndianRed);
             }
             return null;
         }// end of LookupLockoutSource
@@ -642,10 +647,10 @@ namespace ADUtils
         /// </summary>
         private static void PrintEventLogBlockedHelp()
         {
-            Console.WriteLine($"\tThe DCs' remote Security log is not readable from this machine.".Pastel(Color.IndianRed));
-            Console.WriteLine($"\tPort 135 answers but the RPC call is refused, so the dynamic RPC range is blocked.".Pastel(Color.Gray));
-            Console.WriteLine($"\tFix: enable the {"Remote Event Log Management".Pastel(Color.MediumPurple)} inbound firewall rules on the DCs,".Pastel(Color.Gray));
-            Console.WriteLine($"\tand ensure the admin account is in {"Event Log Readers".Pastel(Color.MediumPurple)}. Until then use ADUC / a DC session.".Pastel(Color.Gray));
+            AppLog.Warn($"\tThe DCs' remote Security log is not readable from this machine.", color: Color.IndianRed);
+            AppLog.Screen($"\tPort 135 answers but the RPC call is refused, so the dynamic RPC range is blocked.", Color.Gray);
+            AppLog.Screen($"\tFix: enable the {"Remote Event Log Management".Pastel(Color.MediumPurple)} inbound firewall rules on the DCs,", Color.Gray);
+            AppLog.Screen($"\tand ensure the admin account is in {"Event Log Readers".Pastel(Color.MediumPurple)}. Until then use ADUC / a DC session.", Color.Gray);
         }// end of PrintEventLogBlockedHelp
 
         /// <summary>

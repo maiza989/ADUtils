@@ -47,7 +47,7 @@ namespace ADUtils
 
                     smtpServer.Send(mail);
                 }// end of using
-                Console.WriteLine($"\nNotification email sent successfully.".Pastel(Color.SpringGreen));
+                AppLog.Info($"\nNotification email sent successfully.", Color.SpringGreen);
             }// end of try
             catch (Exception ex)
             {

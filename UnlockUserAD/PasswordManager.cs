@@ -28,7 +28,7 @@ namespace ADUtils
         /// </summary>
         public void ResetUserPassowrd()
         {
-            Console.Write("Enter the username to reset password for: ");
+            AppLog.Prompt("Enter the username to reset password for: ");
             string username = ConsoleInput.ReadTrimmed();
 
             try
@@ -39,16 +39,16 @@ namespace ADUtils
 
                     if (user != null)
                     {
-                        Console.WriteLine($"\nPassword Requirement: {MinimumPasswordLength} Characters, Symbols, Number, Lower and upper case. ");
-                        Console.Write("Enter the desired password: ");
+                        AppLog.Screen($"\nPassword Requirement: {MinimumPasswordLength} Characters, Symbols, Number, Lower and upper case. ");
+                        AppLog.Prompt("Enter the desired password: ");
                         // Masked, and never echoed back. This used to read with Console.ReadLine()
                         // and then print the password to the screen for confirmation.
                         string password = GetPassword();
 
                         if (IsPasswordVaild(password))
                         {
-                            Console.Write($"Password accepted ({password.Length} characters).\n" +
-                                              $"Set this password for '{username}'?(Y/N)");
+                            AppLog.Prompt($"Password accepted ({password.Length} characters).\n" +
+                                          $"Set this password for '{username}'?(Y/N)");
                             string comfirmation = ConsoleInput.ReadTrimmedUpper();
 
                             if (comfirmation == "Y")
@@ -56,26 +56,24 @@ namespace ADUtils
 
                                 user.SetPassword(password);
                                 user.Save();
-                                string logEntry = $"User \"{user}\" Password has been changed successfully at {DateTime.Now}\n";
-                                Console.WriteLine(logEntry);
+                                string logEntry = $"Password for \"{user}\" has been changed successfully";
+                                AppLog.Info(logEntry, Color.LimeGreen);
                                 auditLogManager?.Log(logEntry); // null-safe: auditLogManager may be null when using default constructor
                                 user.Dispose();
                             }// end of if statement
                             else
                             {
-                                Console.WriteLine("Returning to menu...");
+                                AppLog.Screen("Returning to menu...");
                             }// end of else statement
                         }// end of if statement
                         else
                         {
-                            Console.WriteLine("Password does not meet the requirement. Please try again.");
+                            AppLog.Warn("Password does not meet the requirement. Please try again.");
                         }
                     }// end of if-statemnet
                     else
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkRed;
-                        Console.WriteLine($"User '{username}' not found in Active Directory.");
-                        Console.ForegroundColor = ConsoleColor.Gray;
+                        AppLog.Warn($"User '{username}' not found in Active Directory.", color: Color.IndianRed);
                     }// end of else-statemnet
                 }// end of using
 
@@ -99,12 +97,12 @@ namespace ADUtils
             // to the audit log verbatim if console redirection were ever switched on.
             if (string.IsNullOrEmpty(password))
             {
-                Console.WriteLine("\nNo password was entered!\n".Pastel(Color.IndianRed));
+                AppLog.Warn("\nNo password was entered!\n", color: Color.IndianRed);
                 return false;
             }
             if (password.Length < MinimumPasswordLength)
             {
-                Console.WriteLine($"\nThe password is {password.Length} characters — less than the required {MinimumPasswordLength}!\n".Pastel(Color.IndianRed));
+                AppLog.Warn($"\nThe password is {password.Length} characters — less than the required {MinimumPasswordLength}!\n", color: Color.IndianRed);
                 return false;
             }
 
@@ -115,19 +113,19 @@ namespace ADUtils
 
             if (!hasLowerCase)
             {
-                Console.WriteLine("\nThe password does not have lowercase letters!".Pastel(Color.IndianRed));
+                AppLog.Warn("\nThe password does not have lowercase letters!", color: Color.IndianRed);
             }
             if (!hasUpperCase)
             {
-                Console.WriteLine("\nThe password does not have uppercase letters!".Pastel(Color.IndianRed));
+                AppLog.Warn("\nThe password does not have uppercase letters!", color: Color.IndianRed);
             }
             if (!hasDigit)
             {
-                Console.WriteLine("\nThe password does not have digits!".Pastel(Color.IndianRed));
+                AppLog.Warn("\nThe password does not have digits!", color: Color.IndianRed);
             }
             if (!hasSymbol)
             {
-                Console.WriteLine("\nThe password does not have symbols!".Pastel(Color.IndianRed));
+                AppLog.Warn("\nThe password does not have symbols!", color: Color.IndianRed);
             }
             return hasUpperCase && hasLowerCase && hasDigit && hasSymbol;
         }
@@ -136,7 +134,7 @@ namespace ADUtils
         /// </summary>
         public void GetPasswordExpirationDate()
         {
-            Console.Write("Enter the username to check password expiration: ");
+            AppLog.Prompt("Enter the username to check password expiration: ");
             string username = ConsoleInput.ReadTrimmed();
 
             try
@@ -150,29 +148,21 @@ namespace ADUtils
                         DateTime expirationDate = GetPasswordExpirationDate(user);                                                                               // Calculate password experation date
                         DateTime? lastSetDate = GetPasswordLastSetDate(user);                                                                                     // Calculate password last time it was set
 
-                        Console.ForegroundColor = ConsoleColor.DarkCyan;
-                        Console.WriteLine($"\tPassword last set date for user '{username}': {lastSetDate}");
-                        Console.ForegroundColor = ConsoleColor.Gray;
+                        AppLog.Screen($"\tPassword last set date for user '{username}': {lastSetDate}", Color.DarkCyan);
 
                         if (expirationDate != DateTime.MinValue && user.PasswordNeverExpires == false)
                         {
-                            Console.ForegroundColor = ConsoleColor.DarkCyan;
-                            Console.WriteLine($"\tPassword expiration date for user '{username}': {expirationDate}");
-                            Console.ForegroundColor = ConsoleColor.Gray;
+                            AppLog.Screen($"\tPassword expiration date for user '{username}': {expirationDate}", Color.DarkCyan);
                         }// end inner if-statement
                         if (user.PasswordNeverExpires)
                         {
-                            Console.ForegroundColor = ConsoleColor.DarkYellow;
-                            Console.WriteLine($"Password for user '{username}' never expires.");
-                            Console.ForegroundColor = ConsoleColor.Gray;
+                            AppLog.Screen($"Password for user '{username}' never expires.", Color.DarkGoldenrod);
                         }// end of inner if-statement
 
                     }// end of outter if-satetment
                     else
                     {
-                        Console.ForegroundColor = ConsoleColor.DarkRed;
-                        Console.WriteLine($"User '{username}' not found in Active Directory.");
-                        Console.ForegroundColor = ConsoleColor.Gray;
+                        AppLog.Warn($"User '{username}' not found in Active Directory.", color: Color.IndianRed);
                     }// end of else-statement
                 }// end of using
             }// end of Try-Catch

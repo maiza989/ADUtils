@@ -44,6 +44,8 @@ namespace ADUtils
 
             if (!ok)
             {
+                // Raw Console on purpose: logging is the thing that is broken, so routing this
+                // through AppLog would send the warning about missing logs into the missing logs.
                 Console.WriteLine("WARNING: logging is NOT configured — no audit trail will be written.".Pastel(Color.Crimson));
                 Console.WriteLine($"Check that NLog.config sits next to the executable, then read " +
                                   $"{Path.Combine(LogDirectory, "nlog-internal.log").Pastel(Color.MediumPurple)} for the reason.".Pastel(Color.Gray));

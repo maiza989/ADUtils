@@ -22,6 +22,48 @@ namespace ADUtils
         // Matches the SGR escape sequences Pastel emits, e.g. ESC[38;2;205;92;92m
         private static readonly Regex AnsiEscape = new Regex(@"\x1B\[[0-9;]*m", RegexOptions.Compiled);
 
+        /// <summary>
+        /// An input prompt. Writes without a trailing newline so the caret stays on the same line,
+        /// and records at Debug so a session trace shows what the operator was asked.
+        /// </summary>
+        public static void Prompt(string message,
+                                  [CallerFilePath] string file = "", [CallerMemberName] string member = "")
+        {
+            Console.Write(message);
+            LoggerFor(file).Debug("{0}: [prompt] {1}", member, Clean(message));
+        }// end of Prompt
+
+        /// <summary>
+        /// Interface text -- menus, headings, listings, retrieved attribute values. Shown to the
+        /// operator and recorded at Debug, so the session trace can be replayed without this
+        /// drowning out the Info-level record of what actually changed.
+        /// </summary>
+        public static void Screen(string message, Color? color = null,
+                                  [CallerFilePath] string file = "", [CallerMemberName] string member = "")
+        {
+            Console.WriteLine(color.HasValue ? message.Pastel(color.Value) : message);
+            LoggerFor(file).Debug("{0}: {1}", member, Clean(message));
+        }// end of Screen
+
+        /// <summary>
+        /// A blank separator line. Console only -- spacing carries no information worth recording.
+        /// </summary>
+        public static void Blank()
+        {
+            Console.WriteLine();
+        }// end of Blank
+
+        /// <summary>
+        /// Console only -- deliberately never logged.
+        ///
+        /// For values that must reach the operator's eyes but must not persist to disk, i.e. the
+        /// generated temporary password. Do not "tidy" this into Screen().
+        /// </summary>
+        public static void ScreenOnly(string message, Color? color = null)
+        {
+            Console.WriteLine(color.HasValue ? message.Pastel(color.Value) : message);
+        }// end of ScreenOnly
+
         /// <summary>Operator-facing progress or result. Console + log at Info.</summary>
         public static void Info(string message, Color? color = null,
                                 [CallerFilePath] string file = "", [CallerMemberName] string member = "")
