@@ -175,6 +175,7 @@ class Program
             Console.WriteLine("1. Unlock a Specific User");
             Console.WriteLine("2. Check All Locked Accounts");
             Console.WriteLine("3. Unlock All Locked Accounts");
+            Console.WriteLine("4. Find Lockout Source for a User");
             Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
             string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
@@ -187,6 +188,9 @@ class Program
                     break;
                 case "3":
                     ADManager.UnlockAllUsers(context);
+                    break;
+                case "4":
+                    ADManager.FindLockoutSource();
                     break;
                 case "exit":
                     exit = true;

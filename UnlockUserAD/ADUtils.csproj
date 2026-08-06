@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Platforms>AnyCPU;x64</Platforms>
-    <Configurations>Debug;Release;wowee;Debug-2</Configurations>
+    <Configurations>Debug;Release;wowee;Debug-2;Test111</Configurations>
   </PropertyGroup>
 
   <ItemGroup>

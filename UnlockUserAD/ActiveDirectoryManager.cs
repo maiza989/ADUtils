@@ -11,6 +11,19 @@ namespace ADUtils
 
     public class ActiveDirectoryManager
     {
+        /// <summary>
+        /// How long to wait on one DC's Security log before giving up. A firewall-blocked RPC call
+        /// takes ~21 seconds to fail on its own, which is far longer than an operator should wait
+        /// for an optional detail.
+        /// </summary>
+        private const int LockoutLookupTimeoutSeconds = 8;
+
+        /// <summary>
+        /// How far back to search for the lockout event. Bounding this keeps the DC from scanning
+        /// the entire Security log.
+        /// </summary>
+        private const int LockoutSearchWindowDays = 7;
+
         PasswordManager passwordManager = new PasswordManager();
 
         private string _adminUsername;
@@ -18,11 +31,20 @@ namespace ADUtils
         private string _domain;
         private List<string> _domainControllers = new List<string>();
 
+        /// <summary>
+        /// Set once the remote Security log is shown to be unreachable, so later lookups in the
+        /// same session fail instantly instead of paying the timeout again.
+        /// </summary>
+        private bool _eventLogBlocked;
+
         public void SetAdminCredentials(string adminUsername, string adminPassword, IConfiguration configuration)
         {
             _adminUsername = adminUsername;
             _adminPassword = adminPassword;
-            _domain = configuration["AccountCreationSettings:myDomainName"];
+
+            // myDomainName holds a *domain controller* hostname (e.g. "LMDC2"), which is what
+            // PrincipalContext wants. EventLogSession needs the account's DOMAIN, so use myDomain.
+            _domain = configuration["AccountCreationSettings:myDomain"];
 
             // Load all domain controllers from config — uses GetChildren() to avoid requiring Binder package
             _domainControllers = configuration.GetSection("AccountCreationSettings:myDomainControllers")
@@ -33,8 +55,6 @@ namespace ADUtils
 
             if (_domainControllers.Count == 0)
                 Console.WriteLine("Warning: No domain controllers configured in Appsettings.json.".Pastel(Color.DarkGoldenrod));
-            else
-                Console.WriteLine($"Loaded {_domainControllers.Count} domain controller(s): {string.Join(", ", _domainControllers)}".Pastel(Color.DarkCyan));
         }// end of SetAdminCredentials
 
         /// <summary>
@@ -382,21 +402,20 @@ namespace ADUtils
                     return;
                 }
 
-                // One sweep of Event 4740 across the DCs for all locked accounts at once. Calling
-                // this per user meant up to (users x DCs) connections and (users x DCs x 50) event
-                // reads for a single menu selection.
-                Dictionary<string, string> lockoutSources = GetLockoutSources();
-
+                // Deliberately no event-log lookup here. Listing who is locked must stay fast;
+                // finding *where* they were locked costs seconds per DC and is a drill-down, so it
+                // lives on its own menu option (see FindLockoutSource).
                 foreach (var locked in lockedUsers)
                 {
-                    string workstationName = lockoutSources.TryGetValue(locked.SamAccountName, out string caller) ? caller : "Unknown";
                     string when = locked.LockoutTime?.ToString("MM-dd-yyyy HH:mm:ss tt") ?? "time unavailable";
 
                     // Printed for every locked account. This line used to sit inside the
                     // "lockoutTime exists" branch, so accounts without a readable lockoutTime were
                     // counted as locked but never displayed.
-                    Console.WriteLine($"\t[{when}] - {locked.SamAccountName} - Workstation: {workstationName}".Pastel(Color.Crimson));
+                    Console.WriteLine($"\t[{when}] - {locked.SamAccountName}".Pastel(Color.Crimson));
                 }// end of foreach
+
+                Console.WriteLine($"\n\t{lockedUsers.Count} locked account(s). Use {"'Find Lockout Source'".Pastel(Color.MediumPurple)} to see which machine locked one.".Pastel(Color.Gray));
             }// end of try-catch
             catch (Exception ex)
             {
@@ -432,28 +451,74 @@ namespace ADUtils
         }// end of ReadLockoutTime
 
         /// <summary>
-        /// Sweeps every configured domain controller's Security log for Event ID 4740 (account
-        /// locked out) and builds a map of sAMAccountName to the workstation that caused it.
+        /// Interactive drill-down: asks for a username and reports which machine locked it out,
+        /// from Security Event ID 4740.
         ///
-        /// One sweep serves all locked accounts. Newest events win, so a user locked repeatedly
-        /// reports the most recent source. Returns an empty map -- never throws -- if credentials
-        /// or DCs are missing, so callers just display "Unknown".
+        /// Kept off the "Check All Locked Accounts" path on purpose -- reading a remote Security
+        /// log costs seconds per domain controller, and doing it for every locked account made a
+        /// simple listing take ~30 seconds.
         /// </summary>
-        private Dictionary<string, string> GetLockoutSources()
+        public void FindLockoutSource()
         {
-            const int maxEventsPerDc = 200;
-            var sources = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            bool returnToMenu = false;
+            do
+            {
+                Console.Write($"Enter the username to trace the lockout for (Type {"'exit'".Pastel(Color.MediumPurple)} to return to the menu): ");
+                string username = ConsoleInput.ReadTrimmed();
+
+                if (username.Equals("exit", StringComparison.OrdinalIgnoreCase))
+                {
+                    returnToMenu = true;
+                }
+                else if (username.Length == 0)
+                {
+                    Console.WriteLine("Enter a username, or 'exit' to return to the menu.".Pastel(Color.DarkGoldenrod));
+                }
+                else if (username.IndexOfAny(new[] { '\'', '"', '[', ']', '(', ')', '\\', '/' }) >= 0)
+                {
+                    // The name is interpolated into an XPath predicate below.
+                    Console.WriteLine("That is not a valid sAMAccountName.".Pastel(Color.IndianRed));
+                }
+                else
+                {
+                    string source = LookupLockoutSource(username);
+                    Console.WriteLine(source != null
+                        ? $"\t'{username}' was locked out from: {source.Pastel(Color.Gold)}".Pastel(Color.LimeGreen)
+                        : $"\tNo lockout source found for '{username}'.".Pastel(Color.DarkGoldenrod));
+                }
+            } while (!returnToMenu);
+        }// end of FindLockoutSource
+
+        /// <summary>
+        /// Reads Security Event ID 4740 to find the workstation that locked out one account.
+        ///
+        /// Queries the PDC emulator first, since it processes lockouts and therefore reliably holds
+        /// the 4740 record; other configured DCs are only tried as a fallback. Filtering happens
+        /// server-side via XPath on TargetUserName, so each DC returns one event instead of this
+        /// pulling hundreds and scanning them here. Unreachable DCs are skipped by a short TCP
+        /// probe rather than by waiting out the RPC timeout.
+        /// </summary>
+        /// <returns>The workstation name, or null when it could not be determined.</returns>
+        private string LookupLockoutSource(string username)
+        {
+            if (_eventLogBlocked)
+            {
+                // Established earlier this session -- don't spend the timeout again.
+                PrintEventLogBlockedHelp();
+                return null;
+            }
 
             if (string.IsNullOrEmpty(_adminUsername) || string.IsNullOrEmpty(_adminPassword))
             {
-                Console.WriteLine("Admin credentials not set — cannot determine lockout sources.".Pastel(Color.DarkGoldenrod));
-                return sources;
+                Console.WriteLine("Admin credentials not set — cannot read the Security log.".Pastel(Color.DarkGoldenrod));
+                return null;
             }
 
-            if (_domainControllers.Count == 0)
+            var candidates = BuildDomainControllerSearchOrder();
+            if (candidates.Count == 0)
             {
-                Console.WriteLine("No domain controllers configured in Appsettings.json — cannot determine lockout sources.".Pastel(Color.DarkGoldenrod));
-                return sources;
+                Console.WriteLine("No domain controllers configured in Appsettings.json.".Pastel(Color.DarkGoldenrod));
+                return null;
             }
 
             SecureString securePassword = new SecureString();
@@ -461,73 +526,173 @@ namespace ADUtils
                 securePassword.AppendChar(c);
             securePassword.MakeReadOnly();
 
-            foreach (string dc in _domainControllers)
+            // Filter server-side on both the event id and the target account, and cap the search to
+            // a recent window. Without the time bound the DC scans the whole Security log, which on
+            // a busy DC is far slower than the lookup is worth.
+            long windowMs = (long)TimeSpan.FromDays(LockoutSearchWindowDays).TotalMilliseconds;
+            string xpath = $"*[System[EventID=4740 and TimeCreated[timediff(@SystemTime) <= {windowMs}]]]" +
+                           $" and *[EventData[Data[@Name='TargetUserName']='{username}']]";
+
+            bool anyReachable = false;
+            foreach (string dc in candidates)
             {
-                Console.WriteLine($"Checking {dc} for lockout events...".Pastel(Color.DarkCyan));
-                try
+                if (!IsRpcPortOpen(dc))
                 {
-                    using var session = new EventLogSession(
-                        dc,
-                        _domain,
-                        _adminUsername,
-                        securePassword,
-                        SessionAuthentication.Default);
+                    Console.WriteLine($"\t{dc}: not reachable — skipped.".Pastel(Color.DarkGray));
+                    continue;
+                }
 
-                    EventLogQuery eventsQuery = new EventLogQuery("Security", PathType.LogName, "*[System[EventID=4740]]")
+                anyReachable = true;
+                Console.Write($"\t{dc}: ");
+
+                string caller = null;
+                string failure = null;
+                bool rpcBlocked = false;
+                DateTime? foundAt = null;
+
+                // A blocked RPC call takes ~21 seconds to time out on its own, so bound the wait
+                // instead of letting it dictate how long the operator sits there. The abandoned
+                // thread unwinds on its own; nothing downstream depends on it.
+                var probe = Task.Run(() =>
+                {
+                    try
                     {
-                        Session = session,
-                        ReverseDirection = true     // newest first
-                    };
-
-                    using var logReader = new EventLogReader(eventsQuery);
-
-                    int scanned = 0;
-                    for (EventRecord evt = logReader.ReadEvent();
-                         evt != null && scanned < maxEventsPerDc;
-                         evt = logReader.ReadEvent(), scanned++)
-                    {
-                        using (evt)
+                        using var session = new EventLogSession(dc, _domain, _adminUsername, securePassword, SessionAuthentication.Default);
+                        var eventsQuery = new EventLogQuery("Security", PathType.LogName, xpath)
                         {
-                            string xml = evt.ToXml();
+                            Session = session,
+                            ReverseDirection = true     // newest first
+                        };
 
-                            // Read the target name from its own field rather than testing whether the
-                            // XML merely contains the username -- a substring test matched unrelated
-                            // events for similarly named accounts (e.g. "jsmith" inside "jsmithers").
-                            string target = ExtractXmlDataValue(xml, "TargetUserName");
-                            if (string.IsNullOrWhiteSpace(target)) continue;
+                        using var logReader = new EventLogReader(eventsQuery);
+                        using EventRecord evt = logReader.ReadEvent();
 
-                            string callerName = ExtractXmlDataValue(xml, "CallerComputerName");
-                            if (string.IsNullOrWhiteSpace(callerName)) continue;
-
-                            // Newest first, so the first entry seen for a user is the latest one.
-                            if (!sources.ContainsKey(target))
-                            {
-                                sources[target] = callerName.TrimStart('\\');
-                            }
+                        if (evt == null)
+                        {
+                            failure = $"no 4740 event for this user in the last {LockoutSearchWindowDays} days.";
+                            return;
                         }
+
+                        string found = ExtractXmlDataValue(evt.ToXml(), "CallerComputerName");
+                        if (string.IsNullOrWhiteSpace(found))
+                        {
+                            failure = "event found but it carries no CallerComputerName.";
+                            return;
+                        }
+                        // Don't write to the console from inside the task -- if the bounded wait
+                        // below has already given up, output would interleave with the next prompt.
+                        foundAt = evt.TimeCreated;
+                        caller = found.TrimStart('\\');
                     }
-                }
-                catch (Exception ex) when (ex.Message.Contains("RPC server is unavailable") ||
-                                           ex.HResult == unchecked((int)0x800706BA))
+                    catch (Exception ex) when (ex.HResult == unchecked((int)0x800706BA) ||
+                                               ex.Message.Contains("RPC server is unavailable"))
+                    {
+                        // Port 135 answered but the RPC call itself failed, which means the dynamic
+                        // RPC port range that 135 redirects to is blocked. No credential works
+                        // around that, and it is a host firewall policy -- so it will be the same
+                        // on every DC. Give up on the rest rather than paying the timeout again.
+                        rpcBlocked = true;
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        failure = $"access denied for '{_adminUsername}' — the account needs to be in Event Log Readers on {dc}.";
+                    }
+                    catch (EventLogNotFoundException)
+                    {
+                        failure = "no Security log.";
+                    }
+                    catch (Exception ex)
+                    {
+                        failure = ex.Message;
+                    }
+                });
+
+                if (!probe.Wait(TimeSpan.FromSeconds(LockoutLookupTimeoutSeconds)))
                 {
-                    Console.WriteLine($"DC '{dc}' is unreachable (RPC unavailable) — skipping.".Pastel(Color.DarkGoldenrod));
+                    Console.WriteLine($"gave up after {LockoutLookupTimeoutSeconds}s.".Pastel(Color.DarkGoldenrod));
+                    _eventLogBlocked = true;
+                    PrintEventLogBlockedHelp();
+                    return null;
                 }
-                catch (UnauthorizedAccessException)
+
+                if (caller != null)
                 {
-                    Console.WriteLine($"Access denied on '{dc}' — skipping.".Pastel(Color.DarkOrange));
+                    Console.WriteLine($"found ({foundAt:MM-dd-yyyy HH:mm:ss}).".Pastel(Color.DarkOliveGreen));
+                    return caller;
                 }
-                catch (EventLogNotFoundException)
+                if (rpcBlocked)
                 {
-                    Console.WriteLine($"Security log not found on '{dc}' — skipping.".Pastel(Color.DarkGoldenrod));
+                    Console.WriteLine("remote Security log is blocked.".Pastel(Color.DarkGoldenrod));
+                    _eventLogBlocked = true;
+                    PrintEventLogBlockedHelp();
+                    return null;
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error querying '{dc}': {ex.Message} — skipping.".Pastel(Color.DarkOrange));
-                }
+                Console.WriteLine(failure.Pastel(Color.DarkGray));
             }
 
-            return sources;
-        }// end of GetLockoutSources
+            if (!anyReachable)
+            {
+                Console.WriteLine("\tNone of the configured domain controllers are reachable.".Pastel(Color.IndianRed));
+            }
+            return null;
+        }// end of LookupLockoutSource
+
+        /// <summary>
+        /// Explains the one thing that actually has to change for this lookup to work.
+        /// </summary>
+        private static void PrintEventLogBlockedHelp()
+        {
+            Console.WriteLine($"\tThe DCs' remote Security log is not readable from this machine.".Pastel(Color.IndianRed));
+            Console.WriteLine($"\tPort 135 answers but the RPC call is refused, so the dynamic RPC range is blocked.".Pastel(Color.Gray));
+            Console.WriteLine($"\tFix: enable the {"Remote Event Log Management".Pastel(Color.MediumPurple)} inbound firewall rules on the DCs,".Pastel(Color.Gray));
+            Console.WriteLine($"\tand ensure the admin account is in {"Event Log Readers".Pastel(Color.MediumPurple)}. Until then use ADUC / a DC session.".Pastel(Color.Gray));
+        }// end of PrintEventLogBlockedHelp
+
+        /// <summary>
+        /// Configured DCs, with the PDC emulator first because it is the DC that processes lockouts
+        /// and so is the most likely to hold the 4740 record.
+        /// </summary>
+        private List<string> BuildDomainControllerSearchOrder()
+        {
+            var ordered = new List<string>();
+            try
+            {
+                string pdc = System.DirectoryServices.ActiveDirectory.Domain.GetComputerDomain().PdcRoleOwner.Name;
+                if (!string.IsNullOrWhiteSpace(pdc)) ordered.Add(pdc);
+            }
+            catch
+            {
+                // Not domain-joined or the PDC can't be located; fall back to the configured list.
+            }
+
+            foreach (string dc in _domainControllers)
+            {
+                // Match short name against the PDC's FQDN so it isn't probed twice.
+                bool alreadyQueued = ordered.Any(existing =>
+                    existing.Equals(dc, StringComparison.OrdinalIgnoreCase) ||
+                    existing.StartsWith(dc + ".", StringComparison.OrdinalIgnoreCase));
+
+                if (!alreadyQueued) ordered.Add(dc);
+            }
+            return ordered;
+        }// end of BuildDomainControllerSearchOrder
+
+        /// <summary>
+        /// Short TCP probe of the RPC endpoint mapper, so an offline DC costs well under a second
+        /// instead of the ~8 second RPC timeout.
+        /// </summary>
+        private static bool IsRpcPortOpen(string host)
+        {
+            try
+            {
+                using var client = new System.Net.Sockets.TcpClient();
+                return client.ConnectAsync(host, 135).Wait(TimeSpan.FromMilliseconds(700)) && client.Connected;
+            }
+            catch
+            {
+                return false;
+            }
+        }// end of IsRpcPortOpen
 
         /// <summary>
         /// Extracts the value of a named Data element from a Windows Event XML string.
