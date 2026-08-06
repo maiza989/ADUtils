@@ -705,7 +705,7 @@ namespace ADUtils
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"Could not flag the password for change at next logon: {ex.Message}".Pastel(Color.DarkGoldenrod));
+                            AppLog.Warn($"Could not flag the password for change at next logon: {ex.Message}", ex, Color.DarkGoldenrod);
                             Console.WriteLine("Set 'User must change password at next logon' manually in ADUC.".Pastel(Color.DarkGoldenrod));
                         }
 
@@ -726,7 +726,7 @@ namespace ADUtils
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Manager could not be set to '{manager}': {ex.Message}".Pastel(Color.DarkGoldenrod));
+                                AppLog.Warn($"Manager could not be set to '{manager}': {ex.Message}", ex, Color.DarkGoldenrod);
                             }
 
                             userEntry.CommitChanges();
@@ -741,7 +741,7 @@ namespace ADUtils
                             }
                             catch (COMException ex)
                             {
-                                Console.WriteLine($"Move to '{ouPath}' FAILED: {ex.Message}".Pastel(Color.Crimson));
+                                AppLog.Error($"Move to '{ouPath}' FAILED: {ex.Message}", ex, Color.Crimson);
                                 Console.WriteLine($"'{username}' exists but is still in the default Users container — move it manually.".Pastel(Color.Crimson));
                             }
                         }
@@ -788,7 +788,7 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"Error creating user account: {ex.Message}".Pastel(Color.IndianRed));
+                AppLog.Error($"Error creating user account: {ex.Message}", ex, Color.IndianRed);
             }// end of catch
 
             if (!accountCreated) return; // only exits if creation actually failed
@@ -838,7 +838,7 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"Error checking user account existence: {ex.Message}".Pastel(Color.IndianRed));
+                AppLog.Error($"Error checking user account existence: {ex.Message}", ex, Color.IndianRed);
                 return false;
             }// end of catach
         }// end of IsUserCreated
@@ -1038,7 +1038,7 @@ namespace ADUtils
                 }// end of try
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"An error has occured whie creating CLS folder: {ex.Message}");
+                    AppLog.Error($"An error has occured whie creating CLS folder: {ex.Message}", ex);
                 }// end of catch
             }// end of if-statement
             else
@@ -1110,7 +1110,7 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred while trying to start the process: {ex.Message}");
+                AppLog.Error($"An error occurred while trying to start the process: {ex.Message}", ex);
             }// end of catch
         }// end of LaunchBRPMgr
         /// <summary>
@@ -1130,7 +1130,7 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred while trying to start the process: {ex.Message}");
+                AppLog.Error($"An error occurred while trying to start the process: {ex.Message}", ex);
             }// end of catch
         }// end of LaunchVLMMgr
         /// <summary>
@@ -1150,7 +1150,7 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                AppLog.Error($"An error occurred: {ex.Message}", ex);
             }// end of catch
         }// end of LaunchHostMyCallsSite
         /// <summary>
@@ -1170,7 +1170,7 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                AppLog.Error($"An error occurred: {ex.Message}", ex);
             }// end of catch
         }// end of LaunchO365Site
         static void AnimateLine(string line)

@@ -47,7 +47,7 @@ namespace ADUtils
         {
             if (string.IsNullOrWhiteSpace(_exchangeServer))
             {
-                Console.WriteLine("No Exchange server configured (AccountCreationSettings:myExchangeServer).".Pastel(Color.IndianRed));
+                AppLog.Error("No Exchange server configured (AccountCreationSettings:myExchangeServer).");
                 return false;
             }
 
@@ -72,7 +72,7 @@ namespace ADUtils
 
                     if (result == null || result.Count == 0)
                     {
-                        Console.WriteLine($"New-PSSession to '{_exchangeServer}' returned no session.".Pastel(Color.IndianRed));
+                        AppLog.Error($"New-PSSession to '{_exchangeServer}' returned no session.");
                         return false;
                     }
                     _session = result[0];
@@ -92,14 +92,14 @@ namespace ADUtils
                 if (!RunCommand("Set-ADServerSettings", "widening Exchange scope to the whole forest",
                                 new Dictionary<string, object> { ["ViewEntireForest"] = true }))
                 {
-                    Console.WriteLine("Continuing without forest-wide scope.".Pastel(Color.DarkGoldenrod));
+                    AppLog.Warn("Continuing without forest-wide scope.");
                 }
 
                 return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Could not connect to Exchange at '{_exchangeServer}': {ex.Message}".Pastel(Color.IndianRed));
+                AppLog.Error($"Could not connect to Exchange at '{_exchangeServer}': {ex.Message}", ex, Color.IndianRed);
                 return false;
             }
         }// end of Connect
@@ -112,7 +112,7 @@ namespace ADUtils
         {
             if (_runspace == null)
             {
-                Console.WriteLine($"Cannot run '{command}' — no Exchange session is open.".Pastel(Color.IndianRed));
+                AppLog.Error($"Cannot run '{command}' — no Exchange session is open.");
                 return false;
             }
 
@@ -144,7 +144,7 @@ namespace ADUtils
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error {description}: {ex.Message}".Pastel(Color.IndianRed));
+                AppLog.Error($"Error {description}: {ex.Message}", ex, Color.IndianRed);
                 return false;
             }
         }// end of RunCommand
@@ -159,7 +159,9 @@ namespace ADUtils
 
             foreach (ErrorRecord error in ps.Streams.Error)
             {
-                Console.WriteLine($"Error {description}: {error.Exception?.Message ?? error.ToString()}".Pastel(Color.IndianRed));
+                // Log the exception object where PowerShell gave us one, so the file keeps the
+                // stack trace; the console only ever needs the message.
+                AppLog.Error($"Error {description}: {error.Exception?.Message ?? error.ToString()}", error.Exception);
             }// end of foreach
             ps.Streams.Error.Clear();
             return true;

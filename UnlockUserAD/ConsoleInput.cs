@@ -10,10 +10,23 @@ namespace ADUtils
     /// </summary>
     public static class ConsoleInput
     {
+        /// <summary>
+        /// True once stdin has reached end-of-stream. Callers driving a retry loop must check this,
+        /// otherwise substituting an empty string for null turns "no more input" into an infinite
+        /// loop -- e.g. the credential prompt re-asking forever under a scheduled task.
+        /// </summary>
+        public static bool EndOfInput { get; private set; }
+
         /// <summary>Reads a line, returning an empty string at end-of-stream.</summary>
         public static string ReadLine()
         {
-            return Console.ReadLine() ?? string.Empty;
+            string line = Console.ReadLine();
+            if (line == null)
+            {
+                EndOfInput = true;
+                return string.Empty;
+            }
+            return line;
         }// end of ReadLine
 
         /// <summary>Reads a trimmed line, returning an empty string at end-of-stream.</summary>

@@ -82,7 +82,7 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"Error resetting password: {ex.Message}");
+                AppLog.Error($"Error resetting password: {ex.Message}", ex);
             }// end of catch
         }// end of ReserUserPassword
 
@@ -181,7 +181,7 @@ namespace ADUtils
                 // The stray ConsoleColor argument here selected WriteLine(string format, object
                 // arg0), so the already-interpolated message was re-parsed as a format string --
                 // any LDAP/COM message containing braces threw FormatException from the handler.
-                Console.WriteLine($"Error: {ex.Message}".Pastel(Color.Crimson));
+                AppLog.Error($"Error: {ex.Message}", ex, Color.Crimson);
             }// end of catch
         }// end of GetPasswordExpirationDate
 
@@ -214,7 +214,7 @@ namespace ADUtils
             {
                 // Report rather than swallow: a rights failure reading pwdLastSet used to be
                 // indistinguishable from "the password never expires".
-                Console.WriteLine($"Could not determine password expiration for '{user.SamAccountName}': {ex.Message}".Pastel(Color.DarkGoldenrod));
+                AppLog.Warn($"Could not determine password expiration for '{user.SamAccountName}': {ex.Message}", ex, Color.DarkGoldenrod);
                 return DateTime.MinValue;
             }
         }
@@ -235,7 +235,7 @@ namespace ADUtils
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Could not read pwdLastSet for '{user.SamAccountName}': {ex.Message}".Pastel(Color.DarkGoldenrod));
+                AppLog.Warn($"Could not read pwdLastSet for '{user.SamAccountName}': {ex.Message}", ex, Color.DarkGoldenrod);
                 return null;
             }
         }
@@ -301,7 +301,7 @@ namespace ADUtils
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Could not read the domain maximum password age: {ex.Message}".Pastel(Color.DarkGoldenrod));
+                AppLog.Warn($"Could not read the domain maximum password age: {ex.Message}", ex, Color.DarkGoldenrod);
                 return null;
             }
         }

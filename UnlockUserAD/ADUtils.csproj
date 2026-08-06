@@ -20,6 +20,9 @@
     <Content Include="Appsettings.example.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="NLog.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -31,6 +34,7 @@
     <PackageReference Include="Microsoft.PowerShell.ConsoleHost" Version="7.4.3" />
     <PackageReference Include="Microsoft.PowerShell.Native" Version="7.4.0" />
     <PackageReference Include="Microsoft.WSMan.Management" Version="7.4.3" />
+    <PackageReference Include="NLog" Version="6.1.4" />
     <PackageReference Include="Pastel" Version="5.1.0" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
     <PackageReference Include="System.DirectoryServices.AccountManagement" Version="8.0.0" />

@@ -51,7 +51,7 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"\nFailed to send email: {ex.Message}".Pastel(Color.Crimson));
+                AppLog.Error($"\nFailed to send email: {ex.Message}", ex, Color.Crimson);
             }// end of catch
         }// end of SendEmailNotification
     }// end of class

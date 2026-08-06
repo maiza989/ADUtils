@@ -141,7 +141,7 @@ namespace ADUtils
                     }// end of try
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error looking up '{username}': {ex.Message}".Pastel(Color.IndianRed));
+                        AppLog.Error($"Error looking up '{username}': {ex.Message}", ex, Color.IndianRed);
                     }// end of catch
                 }// end of else statement
                 userGroups.Clear();
@@ -187,7 +187,7 @@ namespace ADUtils
                     }// end of Try-Catch
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error Unlocking a user: {ex.Message}".Pastel(Color.IndianRed));
+                        AppLog.Error($"Error Unlocking a user: {ex.Message}", ex, Color.IndianRed);
                     }// end of catch
                 }// end of else
             } while (!returnToMenu);
@@ -223,7 +223,7 @@ namespace ADUtils
                             {
                                 // Report and keep going -- one account we lack rights on shouldn't
                                 // abandon the rest of the sweep.
-                                Console.WriteLine($"\tCould not unlock '{user.SamAccountName}': {ex.Message}".Pastel(Color.IndianRed));
+                                AppLog.Error($"\tCould not unlock '{user.SamAccountName}': {ex.Message}", ex, Color.IndianRed);
                             }
                         }
                     }// end of foreach
@@ -239,7 +239,7 @@ namespace ADUtils
             }// end of Try-Catch
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}".Pastel(Color.IndianRed));
+                AppLog.Error($"Error: {ex.Message}", ex, Color.IndianRed);
             }// end of Catch
         }// end of UnlockAllUsers
 
@@ -419,7 +419,7 @@ namespace ADUtils
             }// end of try-catch
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}".Pastel(Color.IndianRed));
+                AppLog.Error($"Error: {ex.Message}", ex, Color.IndianRed);
             }// end of catch
         }// end of CheckLockedAccounts
 
@@ -445,7 +445,7 @@ namespace ADUtils
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error reading lockoutTime for {user.SamAccountName}: {ex.Message}".Pastel(Color.DarkGoldenrod));
+                AppLog.Warn($"Error reading lockoutTime for {user.SamAccountName}: {ex.Message}", ex, Color.DarkGoldenrod);
                 return null;
             }
         }// end of ReadLockoutTime

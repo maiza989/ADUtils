@@ -50,7 +50,7 @@ class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Appsettings.json could not be read: {ex.Message}".Pastel(Color.IndianRed));
+            AppLog.Error($"Appsettings.json could not be read: {ex.Message}", ex, Color.IndianRed);
             return;
         }
 
@@ -64,7 +64,13 @@ class Program
         string _myDomainName = configuration["AccountCreationSettings:myDomainName"];
 
         Console.WriteLine("Starting Active Directory Manager...");
+        if (AuditLogManager.VerifyLoggingConfigured())
+        {
+            Console.WriteLine($"Logs: {AuditLogManager.LogDirectory}".Pastel(Color.DarkGray));
+        }
 
+        try
+        {
         do
         {
             try
@@ -97,17 +103,31 @@ class Program
                     context.Dispose();
                 }// end of using
             }// end of try
-            catch (DirectoryServicesCOMException) // error out of user credentials are wrong or account is locked
+            catch (DirectoryServicesCOMException ex) // error out of user credentials are wrong or account is locked
             {
                 isAuthenticated = false; // reset so the loop retries credentials
-                Console.WriteLine("Error: Unable to connect to the Active Directory server. Please check your credentials and try again.".Pastel(Color.IndianRed));
+                AppLog.Error("Error: Unable to connect to the Active Directory server. Please check your credentials and try again.", ex);
             }
             catch (Exception ex)
             {
                 isAuthenticated = false; // reset so the loop retries credentials
-                Console.WriteLine($"An error occurred: {ex.Message}".Pastel(Color.IndianRed));
+                AppLog.Error($"An error occurred: {ex.Message}", ex, Color.IndianRed);
             }// end of Catch
+            // Without this the loop would spin forever on a closed or exhausted stdin, since
+            // there is no further input to change the outcome.
+            if (ConsoleInput.EndOfInput && !isAuthenticated)
+            {
+                AppLog.Error("No more console input — giving up on authentication.");
+                break;
+            }
         } while (!isAuthenticated || string.IsNullOrEmpty(adminUsername));                                                                                                                                            // Repeat until a valid password is entered
+        }
+        finally
+        {
+            // Targets are async, so without this the last entries are lost on exit.
+            auditLogManager?.EndSession();
+            NLog.LogManager.Shutdown();
+        }
     }// end of Main Method
 
 

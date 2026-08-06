@@ -88,7 +88,7 @@ namespace ADUtils
                     }// end of try
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error adding user to group: {ex.Message}".Pastel(Color.IndianRed));
+                        AppLog.Error($"Error adding user to group: {ex.Message}", ex, Color.IndianRed);
                     }// end of catch
                 }
             } while (!isExit);
@@ -165,7 +165,7 @@ namespace ADUtils
                     }// end of try
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error removing user from group: {ex.Message}".Pastel(Color.IndianRed));
+                        AppLog.Error($"Error removing user from group: {ex.Message}", ex, Color.IndianRed);
                     }// end of catch
                 }
             } while (!isExit);
@@ -319,7 +319,7 @@ namespace ADUtils
                 }// end of try
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error changing shared mailbox access: {ex.Message}".Pastel(Color.IndianRed));
+                    AppLog.Error($"Error changing shared mailbox access: {ex.Message}", ex, Color.IndianRed);
                 }// end of catch
             } while (!isExit);
 
@@ -373,7 +373,7 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"Error listing groups: {ex.Message}".Pastel(Color.IndianRed));
+                AppLog.Error($"Error listing groups: {ex.Message}", ex, Color.IndianRed);
             }// end of catch
         }// end of ListAllGroups
 
@@ -433,7 +433,7 @@ namespace ADUtils
                     }// end of try-catch
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error listing members of group: {ex.Message}".Pastel(Color.IndianRed));
+                        AppLog.Error($"Error listing members of group: {ex.Message}", ex, Color.IndianRed);
                     }// end of catch
                 }// end of else
             } while (!isExit);

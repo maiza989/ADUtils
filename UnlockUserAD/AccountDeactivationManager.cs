@@ -76,7 +76,7 @@ namespace ADUtils
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Could not remove '{username}' from '{group.Name}': {ex.Message}".Pastel(Color.DarkGoldenrod));
+                                AppLog.Warn($"Could not remove '{username}' from '{group.Name}': {ex.Message}", ex, Color.DarkGoldenrod);
                             }
                         }// end of foreach
                         Console.WriteLine($"User account '{username}' removed from {removed} group(s); 'Domain Users' kept.".Pastel(Color.LimeGreen));
@@ -102,7 +102,7 @@ namespace ADUtils
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Move to '{ouPath}' FAILED: {ex.Message}".Pastel(Color.Crimson));
+                                AppLog.Error($"Move to '{ouPath}' FAILED: {ex.Message}", ex, Color.Crimson);
                                 Console.WriteLine($"'{username}' is disabled but was NOT moved — move it manually.".Pastel(Color.Crimson));
                             }
                         }// end of using
@@ -114,7 +114,7 @@ namespace ADUtils
                     }// end of try
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error deactivating user '{username}': {ex.Message}".Pastel(Color.Crimson));
+                        AppLog.Error($"Error deactivating user '{username}': {ex.Message}", ex, Color.Crimson);
                     }// end of catch
                 }// end of else statement
             } while (!returnToMenu);
