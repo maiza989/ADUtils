@@ -1,51 +1,52 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Pastel;
 using System.Drawing;
 using System.Net.Mail;
 
 
-
-// TODO - DONE Add who made the changes to the email notifications.
 namespace ADUtils
 {
     public class EmailNotifcationManager
     {
-        string changedBy = Program.adminUsername;
+        private const int DefaultSmtpPort = 25;
+
         private readonly string _mySTMPServer;
+        private readonly int _mySTMPPort;
         private readonly string _myFromEmail;
         private readonly string _myToEmail;
-        private readonly string _myPassword;
-        // string mySTMPServer = Environment.GetEnvironmentVariable("STMP_SERVER");                                                            // Replace with your STMP server.
-        // string myFromEmail = Environment.GetEnvironmentVariable("MY_FROMEMAIL");                                                            // Replace with your From email
-        // string myToEmail = Environment.GetEnvironmentVariable("MY_TOEMAIL");                                                                // Replace with your To email
-        // string myPassword = Environment.GetEnvironmentVariable("MY_PASSWORD");                                                              // Replace with your email password
-
 
         public EmailNotifcationManager(IConfiguration configuration)
         {
-            
             _mySTMPServer = configuration["EmailSettings:mySTMPServer"];
             _myFromEmail = configuration["EmailSettings:myFromEmail"];
             _myToEmail = configuration["EmailSettings:myToEmail"];
-            _myPassword = configuration["EmailSettings:myPassword"];
+            _mySTMPPort = int.TryParse(configuration["EmailSettings:mySTMPPort"], out int port) ? port : DefaultSmtpPort;
         }// end of constructor
+
         public void SendEmailNotification(string subject, string body)
         {
+            // Read the admin name at send time rather than in a field initializer. Managers are
+            // constructed before credentials are collected, so capturing it at construction left
+            // this null on every deactivation email.
+            string changedBy = string.IsNullOrWhiteSpace(Program.adminUsername) ? "unknown" : Program.adminUsername;
+
             try
             {
-                MailMessage mail = new MailMessage();                                                                                       // Create a new message
-                SmtpClient smtpServer = new SmtpClient(_mySTMPServer);                                                                      // Replace with your SMTP server
+                using (MailMessage mail = new MailMessage())
+                using (SmtpClient smtpServer = new SmtpClient(_mySTMPServer))
+                {
+                    mail.From = new MailAddress(_myFromEmail);
+                    mail.To.Add(_myToEmail);
+                    mail.Subject = subject;
+                    mail.Body = $"{body}\n\nChanges made by: {changedBy}";
 
-                mail.From = new MailAddress(_myFromEmail);                                                                                   // Replace with your FROM email
-                mail.To.Add(_myToEmail);                                                                                                     // Replace with your TO email
-                mail.Subject = subject;
-                mail.Body = $"{body}\n\nChanges made by: {changedBy}";
+                    // Unauthenticated submission to the internal relay -- no credential is stored
+                    // in config or sent over the wire. See Appsettings.example.json.
+                    smtpServer.Port = _mySTMPPort;
+                    smtpServer.UseDefaultCredentials = false;
 
-                smtpServer.Port = 587;                                                                                                      // Typically 587 for SMTP
-                smtpServer.Credentials = new System.Net.NetworkCredential(_myFromEmail, _myPassword);                                         // Replace with your credentials
-                smtpServer.EnableSsl = false;                                                                                               // Enable SSL if required by your SMTP provider
-
-                smtpServer.Send(mail);
+                    smtpServer.Send(mail);
+                }// end of using
                 Console.WriteLine($"\nNotification email sent successfully.".Pastel(Color.SpringGreen));
             }// end of try
             catch (Exception ex)

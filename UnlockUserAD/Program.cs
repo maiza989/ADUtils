@@ -4,48 +4,28 @@ using ADUtils;
 using Pastel;
 using System.Drawing;
 using Microsoft.Extensions.Configuration;
-using System.Security.Cryptography.X509Certificates;
-using Yubico.YubiKey.Piv;
-using System.Security.Cryptography;
-using System.Net.Security;
-using System.Net;
-using System.Security.Principal;
-using Yubico.YubiKey;
-using System.Runtime.ConstrainedExecution;
-using System.Text;
-using System.DirectoryServices.Protocols;
-// TODO - DONE - Audit Logging: Log fuction to record important action performed.
-// TODO - DONE User Account Deactivation: Implement functionality to deactivate user accounts securely.
 // TODO - Create/Delete Groups: Allow creating and deleting security groups or distribution lists.
 
 
 /// <summary>
-/// Edit the following:
-/// 
-///  - BaseLogDirectory with your desire Log location in AuditLogManager Class.
-/// 
-///  - myDomain, myDomainDotCom, myParentOU, myCompany, myExchangeDatabase, myExchangeServer, and outPath with your own values for successful execution in AccountCreationManager Class.
-/// 
-///  - mySTMPServer, myFromEmail, myPassword, myToEmail with your own values for successful execution in EmailNotificationManager Class. 
-///  
+/// All deployment-specific values live in Appsettings.json — see Appsettings.example.json
+/// for the full set of keys. Copy that file to Appsettings.json and fill it in before
+/// running. Nothing in this project needs to be edited to point it at a domain.
 /// </summary>
 class Program
 {
 
-    static bool isLocked = false;
-    static int countdownSeconds = 60;
     public static string adminUsername;
     private static string adminPassword;
     static private bool isAuthenticated = false;
     public static IConfiguration configuration;
-    static X509Certificate2 selectedCert;
 
 
     static void GetAdminCreditials()
     {
 
         Console.Write("Enter admin username: ");
-        adminUsername = Console.ReadLine().Trim();
+        adminUsername = ConsoleInput.ReadTrimmed();
         Console.Write("Enter admin password: ");
         adminPassword = PasswordManager.GetPassword().Trim();
     }
@@ -53,17 +33,32 @@ class Program
 
     static void Main(string[] args)
     {
-        configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("Appsettings.json", optional: false, reloadOnChange: true)
-            .Build();
+        try
+        {
+            configuration = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("Appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+        }
+        catch (FileNotFoundException)
+        {
+            Console.WriteLine("Appsettings.json was not found.".Pastel(Color.IndianRed));
+            Console.WriteLine($"Copy {"Appsettings.example.json".Pastel(Color.MediumPurple)} to " +
+                              $"{"Appsettings.json".Pastel(Color.MediumPurple)} in {AppContext.BaseDirectory} " +
+                              "and fill in your domain, Exchange and SMTP values.");
+            return;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Appsettings.json could not be read: {ex.Message}".Pastel(Color.IndianRed));
+            return;
+        }
 
         ActiveDirectoryManager ADManager = new ActiveDirectoryManager();
         AccountCreationManager ACManager;
         PasswordManager PWDManager = null;
         ADGroupActionManager ADGroupManager = null;
         AuditLogManager auditLogManager = null;
-        EmailNotifcationManager emailManager = new EmailNotifcationManager(configuration);
         AccountDeactivationManager ACCDeactivationManager = new AccountDeactivationManager();
 
         string _myDomainName = configuration["AccountCreationSettings:myDomainName"];
@@ -95,7 +90,7 @@ class Program
                         while (!exit)                                                                                                                                          // Loop the menu
                         {
                             DisplayMainMenu();
-                            string choice = Console.ReadLine();
+                            string choice = ConsoleInput.ReadLine();
                             exit = HandleMainMenuChoice(choice, context, ADManager, ADGroupManager, PWDManager, ACManager, ACCDeactivationManager);
                         }// end of while-loop
                     }// end of if statement
@@ -181,7 +176,7 @@ class Program
             Console.WriteLine("2. Check All Locked Accounts");
             Console.WriteLine("3. Unlock All Locked Accounts");
             Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
-            string choice = Console.ReadLine().ToLower().Trim();
+            string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
             {
                 case "1":
@@ -224,7 +219,7 @@ class Program
             Console.WriteLine("6. Check Who is Member in a Group");
             Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
 
-            string choice = Console.ReadLine().ToLower().Trim();
+            string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
             {
                 case "1":
@@ -234,13 +229,13 @@ class Program
                     ADGroupManager.AddUserToGroup(context);
                     break;
                 case "3":
-                    ADGroupManager.RemoveUserToGroup(context);
+                    ADGroupManager.RemoveUserFromGroup(context);
                     break;
                 case "4":
-                    //ADGroupManager.AddUserToSharedMailbox();
+                    ADGroupManager.AddUserToSharedMailbox(context);
                     break;
                 case "5":
-                    //ADGroupManager.RemoveUserToSharedMailbox();
+                    ADGroupManager.RemoveUserFromSharedMailbox(context);
                     break;
                 case "6":
                     ADGroupManager.ListGroupMembers(context);
@@ -276,7 +271,7 @@ class Program
             Console.WriteLine("5. Disable User Account");
             Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
 
-            string choice = Console.ReadLine().ToLower().Trim();
+            string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
             {
                 case "1":

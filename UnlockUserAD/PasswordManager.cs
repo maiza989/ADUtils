@@ -1,22 +1,21 @@
-﻿using System.Data;
-using System.Diagnostics;
-using System.DirectoryServices;
+﻿using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Text.RegularExpressions;
-using ADUtils;
-using System.Reflection; // required for reflection at top of file if not present
-
-    
-
-
-// TODO - DONE Add feature to Reset user password.
+using System.Reflection;
+using Pastel;
+using System.Drawing;
 
 namespace ADUtils
 {
     public class PasswordManager
     {
+        /// <summary>
+        /// Minimum password length enforced by <see cref="IsPasswordVaild"/>. Referenced by the
+        /// prompt text too, so the stated requirement and the check can't drift apart.
+        /// </summary>
+        internal const int MinimumPasswordLength = 15;
+
         AuditLogManager auditLogManager;
-        DateTime todayDate = DateTime.Now;
 
         public PasswordManager() { }
         public PasswordManager(AuditLogManager auditLogManager)
@@ -30,7 +29,7 @@ namespace ADUtils
         public void ResetUserPassowrd()
         {
             Console.Write("Enter the username to reset password for: ");
-            string username = Console.ReadLine();
+            string username = ConsoleInput.ReadTrimmed();
 
             try
             {
@@ -40,17 +39,17 @@ namespace ADUtils
 
                     if (user != null)
                     {
-                        DateTime expirationDate = GetPasswordExpirationDate(user);
-
-                        Console.WriteLine("\nPassword Requirement: 15 Characters, Symbols, Number, Lower and upper case. ");
+                        Console.WriteLine($"\nPassword Requirement: {MinimumPasswordLength} Characters, Symbols, Number, Lower and upper case. ");
                         Console.Write("Enter the desired password: ");
-                        string password = Console.ReadLine();
+                        // Masked, and never echoed back. This used to read with Console.ReadLine()
+                        // and then print the password to the screen for confirmation.
+                        string password = GetPassword();
 
                         if (IsPasswordVaild(password))
                         {
-                            Console.Write($"Password: {password}\n" +
-                                              $"Is this the password you desire?(Y/N)");
-                            string comfirmation = Console.ReadLine().ToUpper().Trim();
+                            Console.Write($"Password accepted ({password.Length} characters).\n" +
+                                              $"Set this password for '{username}'?(Y/N)");
+                            string comfirmation = ConsoleInput.ReadTrimmedUpper();
 
                             if (comfirmation == "Y")
                             {
@@ -93,38 +92,44 @@ namespace ADUtils
         /// </summary>
         /// <param name="password"></param>
         /// <returns></returns>
-        private bool IsPasswordVaild(string password)
+        internal static bool IsPasswordVaild(string password)
         {
-            if (password.Length < 15)
+            // Report which rule failed, never the attempted password. Echoing it here meant a
+            // rejected password appeared on screen up to five times, and would have been written
+            // to the audit log verbatim if console redirection were ever switched on.
+            if (string.IsNullOrEmpty(password))
             {
-                Console.WriteLine($"\nThe password \"{password}\" is less than 15 characters!\n");
+                Console.WriteLine("\nNo password was entered!\n".Pastel(Color.IndianRed));
                 return false;
             }
-            else
+            if (password.Length < MinimumPasswordLength)
             {
-                bool hasUpperCase = Regex.IsMatch(password, "[A-Z]");
-                bool hasLowerCase = Regex.IsMatch(password, "[a-z]");
-                bool hasDigit = Regex.IsMatch(password, "[0-9]");
-                bool hasSymbol = Regex.IsMatch(password, @"[\W_]");
-
-                if (hasLowerCase == false)
-                {
-                    Console.WriteLine($"\nThe password \"{password}\" does not have lowercase letters!");
-                }
-                if (hasUpperCase == false)
-                {
-                    Console.WriteLine($"\nThe password \"{password}\" does not have uppercase letters!");
-                }
-                if (hasDigit == false)
-                {
-                    Console.WriteLine($"\nThe password \"{password}\" does not have digits!");
-                }
-                if (hasSymbol == false)
-                {
-                    Console.WriteLine($"The password\"{password}\" does not have symbols!");
-                }
-                return hasUpperCase && hasLowerCase && hasDigit && hasSymbol;
+                Console.WriteLine($"\nThe password is {password.Length} characters — less than the required {MinimumPasswordLength}!\n".Pastel(Color.IndianRed));
+                return false;
             }
+
+            bool hasUpperCase = Regex.IsMatch(password, "[A-Z]");
+            bool hasLowerCase = Regex.IsMatch(password, "[a-z]");
+            bool hasDigit = Regex.IsMatch(password, "[0-9]");
+            bool hasSymbol = Regex.IsMatch(password, @"[\W_]");
+
+            if (!hasLowerCase)
+            {
+                Console.WriteLine("\nThe password does not have lowercase letters!".Pastel(Color.IndianRed));
+            }
+            if (!hasUpperCase)
+            {
+                Console.WriteLine("\nThe password does not have uppercase letters!".Pastel(Color.IndianRed));
+            }
+            if (!hasDigit)
+            {
+                Console.WriteLine("\nThe password does not have digits!".Pastel(Color.IndianRed));
+            }
+            if (!hasSymbol)
+            {
+                Console.WriteLine("\nThe password does not have symbols!".Pastel(Color.IndianRed));
+            }
+            return hasUpperCase && hasLowerCase && hasDigit && hasSymbol;
         }
         /// <summary>
         /// A method return user password expiration date and last time it was set. 
@@ -132,7 +137,7 @@ namespace ADUtils
         public void GetPasswordExpirationDate()
         {
             Console.Write("Enter the username to check password expiration: ");
-            string username = Console.ReadLine();
+            string username = ConsoleInput.ReadTrimmed();
 
             try
             {
@@ -173,9 +178,10 @@ namespace ADUtils
             }// end of Try-Catch
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Error: {ex.Message}", ConsoleColor.Red);
-                Console.ForegroundColor = ConsoleColor.Gray;
+                // The stray ConsoleColor argument here selected WriteLine(string format, object
+                // arg0), so the already-interpolated message was re-parsed as a format string --
+                // any LDAP/COM message containing braces threw FormatException from the handler.
+                Console.WriteLine($"Error: {ex.Message}".Pastel(Color.Crimson));
             }// end of catch
         }// end of GetPasswordExpirationDate
 
@@ -204,8 +210,11 @@ namespace ADUtils
                 DateTime expiration = pwdLastSet.Value.AddTicks(Math.Abs(maxPwdAge.Value.Ticks));
                 return expiration;
             }
-            catch
+            catch (Exception ex)
             {
+                // Report rather than swallow: a rights failure reading pwdLastSet used to be
+                // indistinguishable from "the password never expires".
+                Console.WriteLine($"Could not determine password expiration for '{user.SamAccountName}': {ex.Message}".Pastel(Color.DarkGoldenrod));
                 return DateTime.MinValue;
             }
         }
@@ -224,8 +233,9 @@ namespace ADUtils
                 DirectoryEntry deUser = (DirectoryEntry)user.GetUnderlyingObject();
                 return ConvertLargeIntegerToDateTime(deUser.Properties["pwdLastSet"].Value);
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"Could not read pwdLastSet for '{user.SamAccountName}': {ex.Message}".Pastel(Color.DarkGoldenrod));
                 return null;
             }
         }
@@ -289,8 +299,9 @@ namespace ADUtils
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"Could not read the domain maximum password age: {ex.Message}".Pastel(Color.DarkGoldenrod));
                 return null;
             }
         }

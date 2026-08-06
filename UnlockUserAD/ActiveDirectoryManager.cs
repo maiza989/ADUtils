@@ -1,20 +1,10 @@
-﻿using ADUtils;
-using Microsoft.Extensions.Configuration;
-
-using Newtonsoft.Json.Linq;
+﻿using Microsoft.Extensions.Configuration;
 using Pastel;
-using System.Data;
-using System.Diagnostics;
-using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
-using System.DirectoryServices.ActiveDirectory;
 using System.Drawing;
-using System.Linq;
-using System.Runtime.InteropServices;
 using System.Security;
-using System.Security.Principal;
 
 namespace ADUtils
 {
@@ -58,60 +48,81 @@ namespace ADUtils
             do
             {
                 Console.Write($"Enter the username to display info about (Type {"'exit'".Pastel(Color.MediumPurple)} to return to the main menu): ");
-                string username = Console.ReadLine().Trim().ToLower();
+                string username = ConsoleInput.ReadTrimmedLower();
 
-                if (username.ToLower().Trim() == "exit")
+                if (username == "exit")
                 {
                     returnToMenu = true;
                 }// end of if statement
+                else if (username.Length == 0)
+                {
+                    Console.WriteLine("Enter a username, or 'exit' to return to the main menu.".Pastel(Color.DarkGoldenrod));
+                }
                 else
                 {
-                    UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
-                    if (user != null)
+                    // This method had no exception handling at all, so any AD hiccup escaped to
+                    // Main's catch, which resets isAuthenticated and re-prompts for credentials --
+                    // a read-only lookup should never log the operator out.
+                    try
                     {
-                        var groups = user.GetGroups();
-                        foreach (var group in groups)
+                        UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
+                        if (user != null)
                         {
-                            userGroups.Add(group.Name);
-                        }// end of foreach
-                        string userGroupsString = string.Join(", ", userGroups);
+                            var groups = user.GetGroups();
+                            foreach (var group in groups)
+                            {
+                                userGroups.Add(group.Name);
+                            }// end of foreach
+                            userGroups.Sort();
+                            string userGroupsString = userGroups.Count > 0 ? string.Join(", ", userGroups) : "N/A";
 
-                        DirectoryEntry directoryEntry = user.GetUnderlyingObject() as DirectoryEntry;
-                        string title = directoryEntry.Properties["title"].Value as string;
-                        string department = directoryEntry.Properties["department"].Value as string;
+                            string title = "N/A";
+                            string department = "N/A";
+                            if (user.GetUnderlyingObject() is DirectoryEntry directoryEntry)
+                            {
+                                title = directoryEntry.Properties["title"].Value as string ?? "N/A";
+                                department = directoryEntry.Properties["department"].Value as string ?? "N/A";
+                            }
 
-                        string lastBadPwd = user.LastBadPasswordAttempt.HasValue
-                            ? TimeZoneInfo.ConvertTimeFromUtc(user.LastBadPasswordAttempt.Value.ToUniversalTime(), TimeZoneInfo.Local).ToString()
-                            : "N/A";
+                            string lastBadPwd = user.LastBadPasswordAttempt.HasValue
+                                ? TimeZoneInfo.ConvertTimeFromUtc(user.LastBadPasswordAttempt.Value.ToUniversalTime(), TimeZoneInfo.Local).ToString()
+                                : "N/A";
 
-                        string lastLogon = user.LastLogon.HasValue
-                            ? TimeZoneInfo.ConvertTimeFromUtc(user.LastLogon.Value.ToUniversalTime(), TimeZoneInfo.Local).ToString()
-                            : "N/A";
+                            // Note: LastLogon reads the non-replicated per-DC lastLogon attribute, so
+                            // the answer varies by which DC responded.
+                            string lastLogon = user.LastLogon.HasValue
+                                ? TimeZoneInfo.ConvertTimeFromUtc(user.LastLogon.Value.ToUniversalTime(), TimeZoneInfo.Local).ToString()
+                                : "N/A";
 
-/*                        // TODO - Make a check if the password or last logon date are null                        
-                        DateTime lastBadPasswordAttemptLocal = TimeZoneInfo.ConvertTimeFromUtc(user.LastBadPasswordAttempt.Value.ToUniversalTime(), TimeZoneInfo.Local);
-                        DateTime lastLogonLocal = TimeZoneInfo.ConvertTimeFromUtc(user.LastLogon.Value.ToUniversalTime(), TimeZoneInfo.Local);*/
-                        
-                        Console.WriteLine($"\nFirst name: {user.GivenName ?? "N/A"}\n" +
-                                          $"Last name: {user.Surname ?? "N/A"}\n" +
-                                          $"Display name: {user.DisplayName ?? "N/A"}\n" +
-                                          $"Username: {user.SamAccountName ?? "N/A"}\n" +
-                                          $"Email: {user.EmailAddress ?? "N/A"}\n" +
-                                          $"Title: {title ?? "N/A"}\n" +
-                                          $"Department: {department ?? "N/A"}\n" +
-                                          $"Member of: {userGroupsString ?? "N/A"}\n" +
-                                          $"Password Last Set: {passwordManager.GetPasswordLastSetDate(user)}\n" +
-                                          $"Password Experation Date: {passwordManager.GetPasswordExpirationDate(user)}\n" +
-                                          $"Bad Logon Counter: {user.BadLogonCount}\n" +
-                                          $"Last Logon: {lastLogon}\n" +
-                                          $"Last Bad Logon Attempt: {lastBadPwd}\n" +
-                                          $"Account Status: {user.Enabled}\n" +
-                                          $"Account Lockout Status: {user.IsAccountLockedOut()}\n" +
-                                          $"Home Directory: {user.HomeDirectory ?? "N/A"}\n" +
-                                          $"SID: {user.Sid}\n" +
-                                          $"");
-
-                    }// end of if statement
+                            Console.WriteLine($"\nFirst name: {user.GivenName ?? "N/A"}\n" +
+                                              $"Last name: {user.Surname ?? "N/A"}\n" +
+                                              $"Display name: {user.DisplayName ?? "N/A"}\n" +
+                                              $"Username: {user.SamAccountName ?? "N/A"}\n" +
+                                              $"Email: {user.EmailAddress ?? "N/A"}\n" +
+                                              $"Title: {title}\n" +
+                                              $"Department: {department}\n" +
+                                              $"Member of: {userGroupsString}\n" +
+                                              $"Password Last Set: {passwordManager.GetPasswordLastSetDate(user)}\n" +
+                                              $"Password Expiration Date: {passwordManager.GetPasswordExpirationDate(user)}\n" +
+                                              $"Bad Logon Counter: {user.BadLogonCount}\n" +
+                                              $"Last Logon: {lastLogon}\n" +
+                                              $"Last Bad Logon Attempt: {lastBadPwd}\n" +
+                                              $"Account Status: {user.Enabled}\n" +
+                                              $"Account Lockout Status: {user.IsAccountLockedOut()}\n" +
+                                              $"Home Directory: {user.HomeDirectory ?? "N/A"}\n" +
+                                              $"SID: {user.Sid}\n" +
+                                              $"");
+                        }// end of if statement
+                        else
+                        {
+                            // Previously this branch was missing entirely, so a typo printed nothing.
+                            Console.WriteLine($"\tUser '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
+                        }// end of else statement
+                    }// end of try
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error looking up '{username}': {ex.Message}".Pastel(Color.IndianRed));
+                    }// end of catch
                 }// end of else statement
                 userGroups.Clear();
             } while (!returnToMenu);
@@ -126,7 +137,7 @@ namespace ADUtils
             do
             {
                 Console.Write($"Enter the username to unlock (type {"'exit'".Pastel(Color.MediumPurple)} to return to the main menu): ");
-                string username = Console.ReadLine().Trim().ToLower();
+                string username = ConsoleInput.ReadTrimmedLower();
 
                 if (username.ToLower().Trim() == "exit")
                 {
@@ -171,22 +182,32 @@ namespace ADUtils
             try
             {
                 Console.WriteLine("\nUnlocking all user accounts...");
-                PrincipalSearcher searcher = new PrincipalSearcher(new UserPrincipal(context) { Enabled = true });
                 bool anyUnlocked = false;
-                foreach (var result in searcher.FindAll())
+                using (PrincipalSearcher searcher = new PrincipalSearcher(new UserPrincipal(context) { Enabled = true }))
+                using (var results = searcher.FindAll())
                 {
-                    UserPrincipal user = result as UserPrincipal;
-                    if (user == null || !user.IsAccountLockedOut())
+                    foreach (var result in results)
                     {
-                        continue;
-                    }
-                    if (user != null && user.IsAccountLockedOut())                                                                             // If-statement to unlock all users
-                    {
-                        user.UnlockAccount();
-                        Console.WriteLine($"\t[{DateTime.Now:MM-dd-yyyy HH:mm:ss tt}]: User account '{user.SamAccountName}' has been unlocked.".Pastel(Color.LimeGreen));
-                        anyUnlocked = true;
-                    }// end of if-statement
-                }// end of foreach
+                        using (result)
+                        {
+                            // The second identical test that used to follow this was always true.
+                            if (!(result is UserPrincipal user) || !user.IsAccountLockedOut()) continue;
+
+                            try
+                            {
+                                user.UnlockAccount();
+                                Console.WriteLine($"\t[{DateTime.Now:MM-dd-yyyy HH:mm:ss tt}]: User account '{user.SamAccountName}' has been unlocked.".Pastel(Color.LimeGreen));
+                                anyUnlocked = true;
+                            }
+                            catch (Exception ex)
+                            {
+                                // Report and keep going -- one account we lack rights on shouldn't
+                                // abandon the rest of the sweep.
+                                Console.WriteLine($"\tCould not unlock '{user.SamAccountName}': {ex.Message}".Pastel(Color.IndianRed));
+                            }
+                        }
+                    }// end of foreach
+                }
                 if (!anyUnlocked)                                                                                                              // If-Else statement to check if any user were unlocked and print appropriate response.
                 {
                     Console.WriteLine("\tNo user accounts were locked.".Pastel(Color.DarkGoldenrod));
@@ -333,84 +354,106 @@ namespace ADUtils
         /// <param name="context">Based in what the computer domain</param>
         public void CheckLockedAccounts(PrincipalContext context)
         {
-           // RunAsAdmin(() =>
-           // {
-                Console.WriteLine("\nLocked user accounts:");
-                try
+            Console.WriteLine("\nLocked user accounts:");
+            try
+            {
+                // Collect the locked accounts first, so the event logs are only queried when
+                // there is actually something to look up.
+                var lockedUsers = new List<(string SamAccountName, DateTime? LockoutTime)>();
+
+                using (PrincipalSearcher searcher = new PrincipalSearcher(new UserPrincipal(context) { Enabled = true }))                       // Creating the search object
+                using (var results = searcher.FindAll())
                 {
-                    PrincipalSearcher searcher = new PrincipalSearcher(new UserPrincipal(context) { Enabled = true });                              // Creating the search object
-                    bool isAnyLocked = false;
-                    foreach (var result in searcher.FindAll())                                                                                      // Look through what is in the user search object
+                    foreach (var result in results)                                                                                             // Look through what is in the user search object
                     {
-                        UserPrincipal user = result as UserPrincipal;
-                        if (user == null || !user.IsAccountLockedOut())
+                        using (result)
                         {
-                            continue;
+                            // The second identical test that used to follow this was always true.
+                            if (!(result is UserPrincipal user) || !user.IsAccountLockedOut()) continue;
+
+                            lockedUsers.Add((user.SamAccountName, ReadLockoutTime(user)));
                         }
-                        if (user != null && user.IsAccountLockedOut())                                                                              // Print out all locked users
-                        {
-                            DirectoryEntry directoryEntry = (user.GetUnderlyingObject() as DirectoryEntry);
-                            DateTime? lockoutTime = null;
-                            string workstationName = "N/A";
-
-
-                            // TODO - DONE Fix grabbing time lock out for users.
-                            if (directoryEntry.Properties.Contains("lockoutTime"))
-                            {
-                                object lockOutValue = directoryEntry.Properties["lockoutTime"].Value;
-                                if (lockOutValue != null)
-                                {
-                                    long lockoutTicks = 0;
-                                        try
-                                        {
-                                            var highPart = (int)lockOutValue.GetType().InvokeMember("HighPart", System.Reflection.BindingFlags.GetProperty, null, lockOutValue, null);
-                                            var lowPart = (int)lockOutValue.GetType().InvokeMember("LowPart", System.Reflection.BindingFlags.GetProperty, null, lockOutValue, null);
-                                            lockoutTicks = ((long)highPart << 32) + (uint)lowPart;
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Console.WriteLine($"Error reading lockoutTime COM object for {user.SamAccountName}: {ex.Message}");
-                                        }
-                                    if (lockoutTicks > 0)
-                                    {
-                                        lockoutTime = DateTime.FromFileTimeUtc(lockoutTicks).ToLocalTime();
-                                    }
-                                }
-                            //    workstationName = GetWorkstationNameFromEvent(user.SamAccountName);
-                                Console.WriteLine($"\t[{lockoutTime?.ToString("MM-dd-yyyy HH:mm:ss tt")}] - {user.SamAccountName} - Workstation: {workstationName}".Pastel(Color.Crimson));
-                            }
-                            isAnyLocked = true;
-                        }// end of if-statement
                     }// end of foreach
-                    if (!isAnyLocked)
-                    {
-                        Console.WriteLine($"\tNo accounts are LOCKED!!! YAY!!!.".Pastel(Color.RoyalBlue));
-                    }// end of if-statement
-                }// end of try-catch
-                catch (Exception ex)
+                }
+
+                if (lockedUsers.Count == 0)
                 {
-                    Console.WriteLine($"Error: {ex.Message}".Pastel(Color.IndianRed));
-                }// end of catch
-          //  });
+                    Console.WriteLine($"\tNo accounts are LOCKED!!! YAY!!!.".Pastel(Color.RoyalBlue));
+                    return;
+                }
+
+                // One sweep of Event 4740 across the DCs for all locked accounts at once. Calling
+                // this per user meant up to (users x DCs) connections and (users x DCs x 50) event
+                // reads for a single menu selection.
+                Dictionary<string, string> lockoutSources = GetLockoutSources();
+
+                foreach (var locked in lockedUsers)
+                {
+                    string workstationName = lockoutSources.TryGetValue(locked.SamAccountName, out string caller) ? caller : "Unknown";
+                    string when = locked.LockoutTime?.ToString("MM-dd-yyyy HH:mm:ss tt") ?? "time unavailable";
+
+                    // Printed for every locked account. This line used to sit inside the
+                    // "lockoutTime exists" branch, so accounts without a readable lockoutTime were
+                    // counted as locked but never displayed.
+                    Console.WriteLine($"\t[{when}] - {locked.SamAccountName} - Workstation: {workstationName}".Pastel(Color.Crimson));
+                }// end of foreach
+            }// end of try-catch
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}".Pastel(Color.IndianRed));
+            }// end of catch
         }// end of CheckLockedAccounts
 
         /// <summary>
-        /// Searches all configured domain controllers for Event ID 4740 to find
-        /// which workstation caused the lockout for the given username.
-        /// Returns the first match found across all DCs.
+        /// Reads the COM lockoutTime attribute off a user, or null when it is absent/unreadable.
         /// </summary>
-        private string GetWorkstationNameFromEvent(string username)
+        private DateTime? ReadLockoutTime(UserPrincipal user)
         {
+            try
+            {
+                if (!(user.GetUnderlyingObject() is DirectoryEntry directoryEntry)) return null;
+                if (!directoryEntry.Properties.Contains("lockoutTime")) return null;
+
+                object lockOutValue = directoryEntry.Properties["lockoutTime"].Value;
+                if (lockOutValue == null) return null;
+
+                // lockoutTime comes back as a COM IADsLargeInteger; read HighPart/LowPart by reflection.
+                var highPart = (int)lockOutValue.GetType().InvokeMember("HighPart", System.Reflection.BindingFlags.GetProperty, null, lockOutValue, null);
+                var lowPart = (int)lockOutValue.GetType().InvokeMember("LowPart", System.Reflection.BindingFlags.GetProperty, null, lockOutValue, null);
+                long lockoutTicks = ((long)highPart << 32) + (uint)lowPart;
+
+                return lockoutTicks > 0 ? DateTime.FromFileTimeUtc(lockoutTicks).ToLocalTime() : (DateTime?)null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error reading lockoutTime for {user.SamAccountName}: {ex.Message}".Pastel(Color.DarkGoldenrod));
+                return null;
+            }
+        }// end of ReadLockoutTime
+
+        /// <summary>
+        /// Sweeps every configured domain controller's Security log for Event ID 4740 (account
+        /// locked out) and builds a map of sAMAccountName to the workstation that caused it.
+        ///
+        /// One sweep serves all locked accounts. Newest events win, so a user locked repeatedly
+        /// reports the most recent source. Returns an empty map -- never throws -- if credentials
+        /// or DCs are missing, so callers just display "Unknown".
+        /// </summary>
+        private Dictionary<string, string> GetLockoutSources()
+        {
+            const int maxEventsPerDc = 200;
+            var sources = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
             if (string.IsNullOrEmpty(_adminUsername) || string.IsNullOrEmpty(_adminPassword))
             {
-                Console.WriteLine("Admin credentials not set — cannot query event log.".Pastel(Color.DarkGoldenrod));
-                return "Unknown (no credentials)";
+                Console.WriteLine("Admin credentials not set — cannot determine lockout sources.".Pastel(Color.DarkGoldenrod));
+                return sources;
             }
 
             if (_domainControllers.Count == 0)
             {
-                Console.WriteLine("No domain controllers configured in Appsettings.json.".Pastel(Color.DarkGoldenrod));
-                return "Unknown (no DCs configured)";
+                Console.WriteLine("No domain controllers configured in Appsettings.json — cannot determine lockout sources.".Pastel(Color.DarkGoldenrod));
+                return sources;
             }
 
             SecureString securePassword = new SecureString();
@@ -418,10 +461,9 @@ namespace ADUtils
                 securePassword.AppendChar(c);
             securePassword.MakeReadOnly();
 
-            // Check each DC — return the first match found
             foreach (string dc in _domainControllers)
             {
-                Console.WriteLine($"Checking {dc} for lockout event...".Pastel(Color.DarkCyan));
+                Console.WriteLine($"Checking {dc} for lockout events...".Pastel(Color.DarkCyan));
                 try
                 {
                     using var session = new EventLogSession(
@@ -441,20 +483,26 @@ namespace ADUtils
 
                     int scanned = 0;
                     for (EventRecord evt = logReader.ReadEvent();
-                         evt != null && scanned < 50;
+                         evt != null && scanned < maxEventsPerDc;
                          evt = logReader.ReadEvent(), scanned++)
                     {
                         using (evt)
                         {
                             string xml = evt.ToXml();
-                            if (xml.Contains(username, StringComparison.OrdinalIgnoreCase))
+
+                            // Read the target name from its own field rather than testing whether the
+                            // XML merely contains the username -- a substring test matched unrelated
+                            // events for similarly named accounts (e.g. "jsmith" inside "jsmithers").
+                            string target = ExtractXmlDataValue(xml, "TargetUserName");
+                            if (string.IsNullOrWhiteSpace(target)) continue;
+
+                            string callerName = ExtractXmlDataValue(xml, "CallerComputerName");
+                            if (string.IsNullOrWhiteSpace(callerName)) continue;
+
+                            // Newest first, so the first entry seen for a user is the latest one.
+                            if (!sources.ContainsKey(target))
                             {
-                                string callerName = ExtractXmlDataValue(xml, "CallerComputerName");
-                                if (!string.IsNullOrWhiteSpace(callerName))
-                                {
-                                    Console.WriteLine($"Lockout source found on {dc}.".Pastel(Color.DarkOliveGreen));
-                                    return callerName;
-                                }
+                                sources[target] = callerName.TrimStart('\\');
                             }
                         }
                     }
@@ -478,9 +526,8 @@ namespace ADUtils
                 }
             }
 
-            Console.WriteLine($"Lockout source for '{username}' not found on any DC.".Pastel(Color.DarkGoldenrod));
-            return "Unknown";
-        }// end of GetWorkstationNameFromEvent
+            return sources;
+        }// end of GetLockoutSources
 
         /// <summary>
         /// Extracts the value of a named Data element from a Windows Event XML string.

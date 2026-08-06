@@ -1,91 +1,86 @@
-﻿using System.DirectoryServices.AccountManagement;
+using System.DirectoryServices.AccountManagement;
 using Pastel;
 using System.Drawing;
-using System.Security.Cryptography.X509Certificates;
-using System.Management.Automation;
 
 namespace ADUtils
 {
     public class ADGroupActionManager
     {
+        private const string EmailSubject = "ADUtil Action: Administrative Action in Active Directory";
+        private const string MailboxEmailSubject = "ADUtil Action: Shared Mailbox Permission Changed";
 
         EmailNotifcationManager emailNotifcation = new EmailNotifcationManager(Program.configuration);
         AuditLogManager auditLogManager;
         List<string> emailActionLog = new List<string>();
+
         public ADGroupActionManager(AuditLogManager auditLogManager)
         {
-            //auditLogManager.RedirectConsoleOutput();                                                                                                                 // Comment out if you want to log everything in the console ** Does not log password **.
             this.auditLogManager = auditLogManager;
-
         }
+
         /// <summary>
         /// A method to add user to group security and distrbuiton list in Active Directory.
         /// </summary>
         /// <param name="context"></param>
         public void AddUserToGroup(PrincipalContext context)
         {
+            // Cleared per visit so re-entering the menu doesn't re-send earlier entries.
+            emailActionLog.Clear();
             bool isExit = false;
 
             do
             {
                 Console.Write($"Enter the username(Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
-                string username = Console.ReadLine().Trim();
-                if (username.ToLower().Trim() == "exit")
+                string username = ConsoleInput.ReadTrimmed();
+                if (username.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    Console.WriteLine($"\nReturing to menu...");
+                    Console.WriteLine($"\nReturning to menu...");
                     break;
                 }
                 Console.Write($"Enter the group name (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
-                string groupName = Console.ReadLine().Trim();
-                if (groupName.ToLower().Trim() == "exit")
+                string groupName = ConsoleInput.ReadTrimmed();
+                if (groupName.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    Console.WriteLine($"\nReturing to menu...");
+                    Console.WriteLine($"\nReturning to menu...");
                     break;
                 }
                 else
                 {
                     try
                     {
-
-                        /* X509Certificate2 certificate = Program.GetAdminCertificate();
-                         if (certificate == null)
-                         {
-                             Console.WriteLine("No valid smart card certificate found.");
-                             return;
-                         }*/
                         UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);                                              // Check for user in AD
 
                         if (user != null)
                         {
-
                             GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName);                                                                   // Check for group in AD
 
                             if (group != null)
                             {
-                                if (!group.Members.Contains(user))                                                                                                      // If the user is not in the group add him
+                                using (group)
                                 {
-                                    group.Members.Add(user);                                                                                                            // Add the user to the group
-                                    group.Save(context);                                                                                                                       // Apply changes
-                                    group.Dispose();
-                                    Console.WriteLine($"User '{username}' added to group '{groupName}' successfully.".Pastel(Color.LimeGreen));
+                                    if (!group.Members.Contains(user))                                                                                                 // If the user is not in the group add him
+                                    {
+                                        group.Members.Add(user);                                                                                                       // Add the user to the group
+                                        group.Save(context);                                                                                                           // Apply changes
+                                        Console.WriteLine($"User '{username}' added to group '{groupName}' successfully.".Pastel(Color.LimeGreen));
 
-                                    string logEntry = ($"\"{user.DisplayName}\" has been Added to \"{groupName}\" group in Active Directory\n");
-                                    emailActionLog.Add(logEntry);
-                                    auditLogManager.Log(logEntry);
-
-                                }// end of inner-2 if-statement
-                                else
-                                {
-                                    Console.WriteLine($"User '{username}' is already a member of group '{groupName}'.".Pastel(Color.DarkGoldenrod));
-                                }// end of inner-2 else-statement
+                                        string logEntry = ($"\"{user.DisplayName}\" has been Added to \"{groupName}\" group in Active Directory\n");
+                                        emailActionLog.Add(logEntry);
+                                        auditLogManager.Log(logEntry);
+                                    }// end of inner-2 if-statement
+                                    else
+                                    {
+                                        Console.WriteLine($"User '{username}' is already a member of group '{groupName}'.".Pastel(Color.DarkGoldenrod));
+                                    }// end of inner-2 else-statement
+                                }// end of using
                             }// end of inner if-statement
                             else
                             {
                                 Console.WriteLine($"Group '{groupName}' not found in Active Directory.".Pastel(Color.IndianRed));
                             }// end of outter else-statement
-                        }// end of outter if-statement 
+                        }// end of outter if-statement
                         else
                         {
                             Console.WriteLine($"User '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
@@ -97,38 +92,35 @@ namespace ADUtils
                     }// end of catch
                 }
             } while (!isExit);
-            if (emailActionLog.Count > 0)
-            {
-                string emailBody = string.Join("\n", emailActionLog);
-                emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
-            }// end of if statement
+
+            SendActionLog(EmailSubject);
         }// end of AddUserToGroup
 
         /// <summary>
         /// A method that remove a user from a security group and distrubtion list in Active Directory
         /// </summary>
         /// <param name="context"></param>
-        public void RemoveUserToGroup(PrincipalContext context)
+        public void RemoveUserFromGroup(PrincipalContext context)
         {
+            emailActionLog.Clear();
             bool isExit = false;
-            List<string> emailActionLog = new List<string>();
 
             do
             {
                 Console.Write($"Enter the username(Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
-                string username = Console.ReadLine().Trim();
-                if (username.ToLower().Trim() == "exit")
+                string username = ConsoleInput.ReadTrimmed();
+                if (username.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    Console.WriteLine($"\nReturing to menu...");
+                    Console.WriteLine($"\nReturning to menu...");
                     break;
                 }
                 Console.Write($"Enter the group name (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
-                string groupName = Console.ReadLine().Trim();
-                if (groupName.ToLower().Trim() == "exit")
+                string groupName = ConsoleInput.ReadTrimmed();
+                if (groupName.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    Console.WriteLine($"\nReturing to menu...");
+                    Console.WriteLine($"\nReturning to menu...");
                     break;
                 }
                 else
@@ -139,34 +131,33 @@ namespace ADUtils
 
                         if (user != null)
                         {
-
                             GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName);                                                                  // Check for group in AD
 
                             if (group != null)
                             {
-                                if (group.Members.Contains(user))                                                                                                      // If the user is not in the group add him
+                                using (group)
                                 {
-                                    // Add the user to the group
-                                    group.Members.Remove(user);                                                                                                        // Apply changes
-                                    group.Save();
-                                    group.Dispose();
-                                    Console.WriteLine($"User '{username}' removed from group '{groupName}' successfully.".Pastel(Color.LimeGreen));
+                                    if (group.Members.Contains(user))
+                                    {
+                                        group.Members.Remove(user);
+                                        group.Save();                                                                                                                 // Apply changes
+                                        Console.WriteLine($"User '{username}' removed from group '{groupName}' successfully.".Pastel(Color.LimeGreen));
 
-                                    string logEntry = ($"\"{user.DisplayName}\" has been removed from \"{groupName}\" group in Active Directory\n");
-                                    emailActionLog.Add(logEntry);
-                                    auditLogManager.Log(logEntry);
-
-                                }// end of inner-2 if-statement
-                                else
-                                {
-                                    Console.WriteLine($"User '{username}' is not a member of group '{groupName}'.".Pastel(Color.DarkGoldenrod));
-                                }// end of inner-2 else-statement
+                                        string logEntry = ($"\"{user.DisplayName}\" has been removed from \"{groupName}\" group in Active Directory\n");
+                                        emailActionLog.Add(logEntry);
+                                        auditLogManager.Log(logEntry);
+                                    }// end of inner-2 if-statement
+                                    else
+                                    {
+                                        Console.WriteLine($"User '{username}' is not a member of group '{groupName}'.".Pastel(Color.DarkGoldenrod));
+                                    }// end of inner-2 else-statement
+                                }// end of using
                             }// end of inner if-statement
                             else
                             {
                                 Console.WriteLine($"Group '{groupName}' not found in Active Directory.".Pastel(Color.IndianRed));
                             }// end of outter else-statement
-                        }// end of outter if-statement 
+                        }// end of outter if-statement
                         else
                         {
                             Console.WriteLine($"User '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
@@ -174,87 +165,166 @@ namespace ADUtils
                     }// end of try
                     catch (Exception ex)
                     {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"Error removing user from group: {ex.Message}");
-                        Console.ForegroundColor = ConsoleColor.Gray;
+                        Console.WriteLine($"Error removing user from group: {ex.Message}".Pastel(Color.IndianRed));
                     }// end of catch
                 }
             } while (!isExit);
 
-            if (emailActionLog.Count > 0)
+            SendActionLog(EmailSubject);
+        }// end of RemoveUserFromGroup
+
+        /// <summary>
+        /// Grants a user FullAccess and Send As on an on-prem Exchange shared mailbox.
+        /// </summary>
+        public void AddUserToSharedMailbox(PrincipalContext context)
+        {
+            ChangeSharedMailboxAccess(context, granting: true);
+        }// end of AddUserToSharedMailbox
+
+        /// <summary>
+        /// Revokes a user's FullAccess and Send As on an on-prem Exchange shared mailbox.
+        /// </summary>
+        public void RemoveUserFromSharedMailbox(PrincipalContext context)
+        {
+            ChangeSharedMailboxAccess(context, granting: false);
+        }// end of RemoveUserFromSharedMailbox
+
+        /// <summary>
+        /// Shared implementation for granting and revoking shared-mailbox access.
+        ///
+        /// Uses the on-prem Exchange cmdlet pairs -- Add/Remove-MailboxPermission for FullAccess and
+        /// Add/Remove-ADPermission for Send As. The Exchange Online equivalent
+        /// (Add-RecipientPermission via Connect-ExchangeOnline) does not exist on Exchange 2016,
+        /// which is where this deployment's mailboxes live.
+        /// </summary>
+        private void ChangeSharedMailboxAccess(PrincipalContext context, bool granting)
+        {
+            emailActionLog.Clear();
+            string verb = granting ? "grant" : "revoke";
+            bool isExit = false;
+
+            do
             {
-                string emailBody = string.Join("\n", emailActionLog);
-                emailNotifcation.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
-            }
-        }// end of AddUserToGroup
+                Console.Write($"Enter the username to {verb} access for (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                string username = ConsoleInput.ReadTrimmed();
+                if (username.Equals("exit", StringComparison.OrdinalIgnoreCase))
+                {
+                    isExit = true;
+                    Console.WriteLine("\nReturning to menu...");
+                    break;
+                }// end of if statement
 
-        /*   public void AddUserToSharedMailbox()
-           {
-               bool isExit = false;
-               List<string> emailActionLog = new List<string>();
+                Console.Write($"Enter the shared mailbox email or alias (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                string sharedMailbox = ConsoleInput.ReadTrimmed();
+                if (sharedMailbox.Equals("exit", StringComparison.OrdinalIgnoreCase))
+                {
+                    isExit = true;
+                    Console.WriteLine("\nReturning to menu...");
+                    break;
+                }// end of if statement
 
-               do
-               {
-                   Console.Write($"Enter the username (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
-                   string username = Console.ReadLine().Trim();
-                   if (username.ToLower() == "exit")
-                   {
-                       isExit = true;
-                       Console.WriteLine("\nReturning to menu...");
-                       break;
-                   }// end of if statement 
+                if (username.Length == 0 || sharedMailbox.Length == 0)
+                {
+                    Console.WriteLine("Both a username and a shared mailbox are required.".Pastel(Color.DarkGoldenrod));
+                    continue;
+                }
 
-                   Console.Write($"Enter the shared mailbox email or alias (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
-                   string sharedMailbox = Console.ReadLine().Trim();
-                   if (sharedMailbox.ToLower() == "exit")
-                   {
-                       isExit = true;
-                       Console.WriteLine("\nReturning to menu...");
-                       break;
-                   }// end of if statement
+                try
+                {
+                    // Confirm the account exists in AD before asking Exchange to do anything, so a
+                    // typo produces a clear message instead of an opaque Exchange error.
+                    UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
+                    if (user == null)
+                    {
+                        Console.WriteLine($"User '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
+                        continue;
+                    }
 
-                   try
-                   {
-                       using (PowerShell ps = PowerShell.Create())
-                       {
-                           ps.AddScript($@"
-                                       Import-Module ExchangeOnlineManagement;
-                                       Connect-ExchangeOnline -UserPrincipalName malghamgham@lloydmc.com -ErrorAction Stop;
-                                       Add-MailboxPermission -Identity '{sharedMailbox}' -User '{username}' -AccessRights FullAccess -InheritanceType All -ErrorAction Stop;
-                                       Add-RecipientPermission -Identity '{sharedMailbox}' -Trustee '{username}' -AccessRights SendAs -Confirm:$false -ErrorAction Stop;
-                                       Disconnect-ExchangeOnline -Confirm:$false;
-                                       ");
-                            var results = ps.Invoke();
+                    using (var exchange = new ExchangeSessionManager(Program.configuration))
+                    {
+                        if (!exchange.Connect())
+                        {
+                            Console.WriteLine($"Could not {verb} access — no Exchange session.".Pastel(Color.IndianRed));
+                            continue;
+                        }
 
-                           if (ps.HadErrors)
-                           {
-                               foreach (var error in ps.Streams.Error)
-                               {
-                                   Console.WriteLine($"Error: {error.ToString()}".Pastel(Color.IndianRed));
-                               }// end of foreach
-                           }// end of if statement
-                           else
-                           {
-                               Console.WriteLine($"User '{username}' granted FullAccess to shared mailbox '{sharedMailbox}'.".Pastel(Color.LimeGreen));
-                               string logEntry = $"\"{username}\" granted FullAccess to \"{sharedMailbox}\" shared mailbox in Exchange\n";
-                               emailActionLog.Add(logEntry);
-                               auditLogManager.Log(logEntry);
-                           }// end of else statement
-                       }// end of using statement
-                   }// end of try
-                   catch (Exception ex)
-                   {
-                       Console.WriteLine($"Exception while adding user to shared mailbox: {ex.Message}".Pastel(Color.IndianRed));
-                   }// end of catch
+                        // FullAccess -- lets the user open the mailbox.
+                        var mailboxParams = new Dictionary<string, object>
+                        {
+                            ["Identity"] = sharedMailbox,
+                            ["User"] = username,
+                            ["AccessRights"] = "FullAccess"
+                        };
+                        if (granting)
+                        {
+                            mailboxParams["InheritanceType"] = "All";
+                        }
+                        else
+                        {
+                            mailboxParams["Confirm"] = false;
+                        }
+                        if (exchange.DomainController != null)
+                        {
+                            mailboxParams["DomainController"] = exchange.DomainController;
+                        }
 
-               } while (!isExit);
+                        bool fullAccessOk = exchange.RunCommand(
+                            granting ? "Add-MailboxPermission" : "Remove-MailboxPermission",
+                            $"{(granting ? "granting" : "revoking")} FullAccess on '{sharedMailbox}' for '{username}'",
+                            mailboxParams);
 
-               if (emailActionLog.Count > 0)
-               {
-                   string emailBody = string.Join("\n", emailActionLog);
-                   emailNotifcation.SendEmailNotification("ADUtil Action: Shared Mailbox Permission Granted", emailBody);
-               }// end of if statement
-           }// end of AddUserToSharedMailbox*/
+                        // Send As -- on-prem uses an AD extended right, not Add-RecipientPermission.
+                        var sendAsParams = new Dictionary<string, object>
+                        {
+                            ["Identity"] = sharedMailbox,
+                            ["User"] = username,
+                            ["ExtendedRights"] = "Send As",
+                            ["Confirm"] = false
+                        };
+                        if (exchange.DomainController != null)
+                        {
+                            sendAsParams["DomainController"] = exchange.DomainController;
+                        }
+
+                        bool sendAsOk = exchange.RunCommand(
+                            granting ? "Add-ADPermission" : "Remove-ADPermission",
+                            $"{(granting ? "granting" : "revoking")} Send As on '{sharedMailbox}' for '{username}'",
+                            sendAsParams);
+
+                        if (!fullAccessOk && !sendAsOk)
+                        {
+                            Console.WriteLine($"Nothing was changed for '{username}' on '{sharedMailbox}'.".Pastel(Color.IndianRed));
+                            continue;
+                        }
+
+                        // Log only the rights that actually changed.
+                        var changed = new List<string>();
+                        if (fullAccessOk) changed.Add("FullAccess");
+                        if (sendAsOk) changed.Add("Send As");
+
+                        string direction = granting ? "granted" : "revoked";
+                        string preposition = granting ? "on" : "from";
+                        Console.WriteLine($"{string.Join(" and ", changed)} {direction} for '{username}' {preposition} '{sharedMailbox}'.".Pastel(Color.LimeGreen));
+
+                        if (!fullAccessOk || !sendAsOk)
+                        {
+                            string missing = fullAccessOk ? "Send As" : "FullAccess";
+                            Console.WriteLine($"{missing} was NOT {direction} — apply it manually in Exchange.".Pastel(Color.DarkGoldenrod));
+                        }
+
+                        string logEntry = $"\"{username}\" — {string.Join(" and ", changed)} {direction} {preposition} shared mailbox \"{sharedMailbox}\" in Exchange\n";
+                        emailActionLog.Add(logEntry);
+                        auditLogManager.Log(logEntry);
+                    }// end of using
+                }// end of try
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error changing shared mailbox access: {ex.Message}".Pastel(Color.IndianRed));
+                }// end of catch
+            } while (!isExit);
+
+            SendActionLog(MailboxEmailSubject);
+        }// end of ChangeSharedMailboxAccess
 
         /// <summary>
         /// A method that list all group secuirty and distrubtion list in Active Directory.
@@ -270,37 +340,36 @@ namespace ADUtils
                 char filterLetter = Console.ReadKey().KeyChar;
                 Console.WriteLine();
 
-                PrincipalSearcher searcher = new PrincipalSearcher(new GroupPrincipal(context));                                                                    // Search for all groups
                 List<string> groupNames = new List<string>();
-
-                foreach (var result in searcher.FindAll())
+                using (PrincipalSearcher searcher = new PrincipalSearcher(new GroupPrincipal(context)))                                                               // Search for all groups
+                using (var results = searcher.FindAll())
                 {
-                    GroupPrincipal group = result as GroupPrincipal;
-                    if (char.ToLower(group.Name[0]) == char.ToLower(filterLetter) || filterLetter == '\r')                                                          // Filter by the first letter or show all groups if Enter is pressed)
+                    foreach (var result in results)
                     {
-                        groupNames.Add(group.Name);
-                    }
-                }// end of foreach
+                        using (result)
+                        {
+                            string name = (result as GroupPrincipal)?.Name;
+                            if (string.IsNullOrEmpty(name)) continue;                                                                                                 // Guard: indexing name[0] on an empty name threw
+
+                            if (char.ToLower(name[0]) == char.ToLower(filterLetter) || filterLetter == '\r')                                                          // Filter by the first letter or show all groups if Enter is pressed)
+                            {
+                                groupNames.Add(name);
+                            }
+                        }// end of using
+                    }// end of foreach
+                }// end of using
+
+                if (groupNames.Count == 0)
+                {
+                    // Previously Max() on an empty list threw "Sequence contains no elements" here.
+                    Console.WriteLine(filterLetter == '\r'
+                        ? "No groups found in Active Directory.".Pastel(Color.DarkGoldenrod)
+                        : $"No groups start with '{filterLetter}'.".Pastel(Color.DarkGoldenrod));
+                    return;
+                }
 
                 groupNames.Sort();
-                int maxGroupNameLength = groupNames.Max(g => g.Length);                                                                                             // use max method to find the longest group length
-                int columnWidth = maxGroupNameLength + 5;                                                                                                           // Add padding
-
-                int numColumns = Console.WindowWidth / columnWidth;                                                                                                 // Calculate number of columns based on window width
-                int numRows = (int)Math.Ceiling((double)groupNames.Count / numColumns);                                                                             // Calculate number of rows. If total number of gorups does not evenly fit into the columns, Matha.Ceiling rounds it to the nearst integer.
-
-                for (int i = 0; i < numRows; i++)                                                                                                                   // Nested for loop to print Group names in a grid style
-                {
-                    for (int j = 0; j < numColumns; j++)
-                    {
-                        int index = i + j * numRows;                                                                                                                // Calculate the index of the gorup base on 'i' rows and 'j' columns
-                        if (index < groupNames.Count)
-                        {
-                            Console.Write($"- {groupNames[index].PadRight(columnWidth)}");                                                                          // Print each group name with specified right padding
-                        }
-                    }// end of inner for loop
-                    Console.WriteLine();
-                }// end of outter for loop
+                PrintInColumns(groupNames);
             }// end of try
             catch (Exception ex)
             {
@@ -318,8 +387,8 @@ namespace ADUtils
             do
             {
                 Console.Write($"Enter the group name (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
-                string groupName = Console.ReadLine().Trim();
-                if (groupName.ToLower() == "exit")
+                string groupName = ConsoleInput.ReadTrimmed();
+                if (groupName.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
                     Console.WriteLine("\nReturning to menu...");
@@ -333,39 +402,29 @@ namespace ADUtils
 
                         if (group != null)
                         {
-                            Console.WriteLine($"\nMembers of group '{groupName}':");
-
-                            List<string> memberNames = new List<string>();
-                            foreach (var member in group.GetMembers())
+                            using (group)
                             {
-                                memberNames.Add(member.SamAccountName);
-                            }// end of foreach
+                                Console.WriteLine($"\nMembers of group '{groupName}':");
 
-                            if (memberNames.Count > 0)
-                            {
-                                memberNames.Sort();
-                                int maxMemberNameLength = memberNames.Max(m => m.Length);                                                                   // Find the longest member name length
-                                int columnWidth = maxMemberNameLength + 5;                                                                                  // Add padding
-                                int numColumns = Console.WindowWidth / columnWidth;                                                                         // Calculate number of columns based on window width
-                                int numRows = (int)Math.Ceiling((double)memberNames.Count / numColumns);                                                    // Calculate number of rows
-
-                                for (int i = 0; i < numRows; i++)                                                                                           // Nested for loop to print member names in a grid style
+                                List<string> memberNames = new List<string>();
+                                foreach (var member in group.GetMembers())
                                 {
-                                    for (int j = 0; j < numColumns; j++)
+                                    if (!string.IsNullOrEmpty(member.SamAccountName))
                                     {
-                                        int index = i + j * numRows;                                                                                        // Calculate the index of the member based on 'i' rows and 'j' columns
-                                        if (index < memberNames.Count)
-                                        {
-                                            Console.Write($"- {memberNames[index].PadRight(columnWidth)}");                                                 // Print each member name with specified right padding
-                                        }// ned of if statement
-                                    }// end of for loop
-                                    Console.WriteLine();
-                                }// end of of for loop 
-                            }// end of if-statement
-                            else
-                            {
-                                Console.WriteLine("No members found in this group.");
-                            }// end of else-statement
+                                        memberNames.Add(member.SamAccountName);
+                                    }
+                                }// end of foreach
+
+                                if (memberNames.Count > 0)
+                                {
+                                    memberNames.Sort();
+                                    PrintInColumns(memberNames);
+                                }// end of if-statement
+                                else
+                                {
+                                    Console.WriteLine("No members found in this group.");
+                                }// end of else-statement
+                            }// end of using
                         }// end of if-statements
                         else
                         {
@@ -379,5 +438,55 @@ namespace ADUtils
                 }// end of else
             } while (!isExit);
         }// end of ListGroupMembers
+
+        /// <summary>
+        /// Prints names in a column grid sized to the console width.
+        ///
+        /// Shared by ListAllGroups and ListGroupMembers, which previously carried identical copies.
+        /// Both divided by a column count that could be zero when a name was wider than the window;
+        /// (int)+Infinity is int.MinValue, so the loop never ran and nothing printed at all.
+        /// </summary>
+        private static void PrintInColumns(List<string> names)
+        {
+            int columnWidth = names.Max(n => n.Length) + 5;                                                                                                          // Add padding
+
+            int windowWidth;
+            try
+            {
+                windowWidth = Console.WindowWidth;
+            }
+            catch (IOException)
+            {
+                windowWidth = 80;                                                                                                                                    // Redirected output has no window
+            }
+
+            int numColumns = Math.Max(1, windowWidth / columnWidth);                                                                                                 // Never 0 — see remarks
+            int numRows = (int)Math.Ceiling((double)names.Count / numColumns);
+
+            for (int i = 0; i < numRows; i++)                                                                                                                        // Nested for loop to print names in a grid style
+            {
+                for (int j = 0; j < numColumns; j++)
+                {
+                    int index = i + j * numRows;                                                                                                                     // Calculate the index based on 'i' rows and 'j' columns
+                    if (index < names.Count)
+                    {
+                        Console.Write($"- {names[index].PadRight(columnWidth)}");                                                                                     // Print each name with specified right padding
+                    }
+                }// end of inner for loop
+                Console.WriteLine();
+            }// end of outter for loop
+        }// end of PrintInColumns
+
+        /// <summary>
+        /// Sends the accumulated action log, if any, and clears it so the next visit starts clean.
+        /// </summary>
+        private void SendActionLog(string subject)
+        {
+            if (emailActionLog.Count == 0) return;
+
+            string emailBody = string.Join("\n", emailActionLog);
+            emailNotifcation.SendEmailNotification(subject, emailBody);
+            emailActionLog.Clear();
+        }// end of SendActionLog
     }// end of class
 }// end of namespace

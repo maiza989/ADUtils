@@ -8,17 +8,26 @@ namespace ADUtils
 {
     class TargetOU
     {
+        /// <summary>What the operator types at the office prompt (KY, MI, GA, REMOTE).</summary>
         public string Office { get; set; }
         public string Role { get; set; }
         public string ParentOU { get; set; }
         public string DisplayName { get; set; }
 
-        public TargetOU(string office, string role, string parentOU, string displayName = null)
+        /// <summary>
+        /// The key used to look up group membership in <see cref="GroupAssignmentHelper"/>.
+        /// Defaults to <see cref="Office"/>; supply it explicitly when the group table uses a
+        /// different name than the office prompt (e.g. Office "REMOTE" -> Region "KY-Remote").
+        /// </summary>
+        public string Region { get; set; }
+
+        public TargetOU(string office, string role, string parentOU, string displayName = null, string region = null)
         {
             Office = office;
             Role = role;
             ParentOU = parentOU;
             DisplayName = displayName ?? role;
+            Region = region ?? office;
         }
     }// end of TragetOU class
     class GroupAssignmentModel
@@ -153,6 +162,16 @@ namespace ADUtils
     {
         Region = "KY-Remote", Role = "Atty",
         Groups = new List<string> { "_COLLECT", "_COLLECTKY", "_Training", "Attorneys", "LM_Atty", "Horizon_Attorney_RDS_Users" }
+    },
+    new GroupAssignmentModel
+    {
+        Region = "KY-Remote", Role = "Acct",
+        Groups = new List<string> { "_COLLECT", "_COLLECTKY", "_Training", "Accounting", "LM_Accounting", "NoAccountingEmail", "Horizon_Accounting_RDS_Users" }
+    },
+    new GroupAssignmentModel
+    {
+        Region = "KY-Remote", Role = "Compliance",
+        Groups = new List<string> { "_COLLECT", "_COLLECTKY", "_Training", "Compliance", "Horizon_RDS_Desktop_Users" }
     },
 };
         public static List<string> GetGroups(string region, string role)
