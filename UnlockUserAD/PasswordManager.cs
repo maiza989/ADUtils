@@ -1,10 +1,12 @@
-﻿
-using System.Data;
+﻿using System.Data;
 using System.Diagnostics;
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Text.RegularExpressions;
 using ADUtils;
+using System.Reflection; // required for reflection at top of file if not present
+
+    
 
 
 // TODO - DONE Add feature to Reset user password.
@@ -55,9 +57,9 @@ namespace ADUtils
 
                                 user.SetPassword(password);
                                 user.Save();
-                                string logEntry = $"User \"{user}\" Password has been changed sucessfully at {DateTime.Now}\n";
+                                string logEntry = $"User \"{user}\" Password has been changed successfully at {DateTime.Now}\n";
                                 Console.WriteLine(logEntry);
-                                auditLogManager.Log(logEntry);
+                                auditLogManager?.Log(logEntry); // null-safe: auditLogManager may be null when using default constructor
                                 user.Dispose();
                             }// end of if statement
                             else
@@ -184,13 +186,29 @@ namespace ADUtils
         /// <returns> Password expiration date</returns>
         public DateTime GetPasswordExpirationDate(UserPrincipal user)
         {
-            DirectoryEntry deUser = (DirectoryEntry)user.GetUnderlyingObject();                                                               // Grab the underlyning object for the user from AD.
-            ActiveDs.IADsUser nativeDeUser = (ActiveDs.IADsUser)deUser.NativeObject;                                                          // Get the native object from AD for the user.
+            if (user == null) return DateTime.MinValue;
 
-            DateTime passwordExpirationDate = nativeDeUser.PasswordExpirationDate;                                                            // Get password expiration date
+            try
+            {
+                DirectoryEntry deUser = (DirectoryEntry)user.GetUnderlyingObject();
+                DateTime? pwdLastSet = ConvertLargeIntegerToDateTime(deUser.Properties["pwdLastSet"].Value);
 
-            return passwordExpirationDate;                                                                                                    // return the password expiration date for the user.
-        }// end of CalcPasswordExpirationDate
+                if (!pwdLastSet.HasValue || user.PasswordNeverExpires)
+                    return DateTime.MinValue;
+
+                TimeSpan? maxPwdAge = GetDomainMaxPasswordAge(user.Context);
+                if (!maxPwdAge.HasValue)
+                    return DateTime.MinValue;
+
+                // maxPwdAge is stored as a negative timespan; add absolute value to last set
+                DateTime expiration = pwdLastSet.Value.AddTicks(Math.Abs(maxPwdAge.Value.Ticks));
+                return expiration;
+            }
+            catch
+            {
+                return DateTime.MinValue;
+            }
+        }
 
         /// <summary>
         /// A method return password last time it was set object for a user
@@ -199,18 +217,83 @@ namespace ADUtils
         /// <returns>Password last changed</returns>
         public DateTime? GetPasswordLastSetDate(UserPrincipal user)
         {
-            DirectoryEntry deUser = (DirectoryEntry)user.GetUnderlyingObject();
-            ActiveDs.IADsUser nativeDeUser = (ActiveDs.IADsUser)deUser.NativeObject;
-            DateTime passwordLastChanged = nativeDeUser.PasswordLastChanged;
+            if (user == null) return null;
 
-            if(passwordLastChanged == null)
+            try
             {
-                Console.WriteLine("Check if the password was never set");
+                DirectoryEntry deUser = (DirectoryEntry)user.GetUnderlyingObject();
+                return ConvertLargeIntegerToDateTime(deUser.Properties["pwdLastSet"].Value);
+            }
+            catch
+            {
                 return null;
             }
-            
-            return passwordLastChanged;                                                                                                       // Return the password last time it changed for the user
-        }// end of getPaswordLastSetDate
+        }
+
+        private DateTime? ConvertLargeIntegerToDateTime(object largeInt)
+        {
+            if (largeInt == null) return null;
+
+            try
+            {
+                // The COM LargeInteger object exposes HighPart and LowPart properties
+                var type = largeInt.GetType();
+                var high = (int)type.InvokeMember("HighPart", BindingFlags.GetProperty, null, largeInt, null);
+                var low  = (int)type.InvokeMember("LowPart",  BindingFlags.GetProperty, null, largeInt, null);
+
+                long fileTime = ((long)high << 32) + (uint)low;
+                if (fileTime <= 0) return null;
+                return DateTime.FromFileTimeUtc(fileTime).ToLocalTime();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private long? ConvertLargeIntegerToLong(object largeInt)
+        {
+            if (largeInt == null) return null;
+            try
+            {
+                var type = largeInt.GetType();
+                var high = (int)type.InvokeMember("HighPart", BindingFlags.GetProperty, null, largeInt, null);
+                var low  = (int)type.InvokeMember("LowPart",  BindingFlags.GetProperty, null, largeInt, null);
+                long value = ((long)high << 32) + (uint)low;
+                return value;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private TimeSpan? GetDomainMaxPasswordAge(PrincipalContext context)
+        {
+            try
+            {
+                // Read defaultNamingContext from RootDSE, then domain object maxPwdAge
+                using (DirectoryEntry rootDse = new DirectoryEntry("LDAP://RootDSE"))
+                {
+                    string defaultNamingContext = rootDse.Properties["defaultNamingContext"].Value as string;
+                    if (string.IsNullOrEmpty(defaultNamingContext)) return null;
+
+                    using (DirectoryEntry domain = new DirectoryEntry($"LDAP://{defaultNamingContext}"))
+                    {
+                        object maxPwdAgeObj = domain.Properties["maxPwdAge"].Value;
+                        long? ticks = ConvertLargeIntegerToLong(maxPwdAgeObj);
+                        if (!ticks.HasValue) return null;
+
+                        // maxPwdAge is negative; create a TimeSpan from absolute ticks
+                        return TimeSpan.FromTicks(Math.Abs(ticks.Value));
+                    }
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         /// <summary>
         /// A method to hide every key press for password input

@@ -1,18 +1,20 @@
-﻿
+﻿using ADUtils;
+using Microsoft.Extensions.Configuration;
+
+using Newtonsoft.Json.Linq;
+using Pastel;
 using System.Data;
 using System.Diagnostics;
+using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
-using ADUtils;
-using System.Diagnostics;
-using System.Linq;
-using Pastel;
+using System.DirectoryServices.ActiveDirectory;
 using System.Drawing;
-using System.Diagnostics.Eventing.Reader;
-using Newtonsoft.Json.Linq;
+using System.Linq;
 using System.Runtime.InteropServices;
-using System.Security.Principal;
 using System.Security;
+using System.Security.Principal;
 
 namespace ADUtils
 {
@@ -20,65 +22,31 @@ namespace ADUtils
     public class ActiveDirectoryManager
     {
         PasswordManager passwordManager = new PasswordManager();
-/*
-        // ✅ ADDED: P/Invoke for LogonUser
-        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        private static extern bool LogonUser(
-            string username,
-            string domain,
-            string password,
-            int logonType,
-            int logonProvider,
-            out IntPtr token);
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool CloseHandle(IntPtr handle);
+        private string _adminUsername;
+        private string _adminPassword;
+        private string _domain;
+        private List<string> _domainControllers = new List<string>();
 
-        private const int LOGON32_LOGON_INTERACTIVE = 2;
-        private const int LOGON32_PROVIDER_DEFAULT = 0;
-        const int LOGON32_LOGON_NEW_CREDENTIALS = 9;
-
-        // ✅ ADDED: Admin credential properties
-        private readonly string _domain = "lmdc4";
-        private readonly string _adminUsername = "admmalghamgham";
-        private readonly string _adminPassword = "****"; // TODO - Update this when testing
-*/
-     /*   public ActiveDirectoryManager(string domain, string adminUsername, string adminPassword)
+        public void SetAdminCredentials(string adminUsername, string adminPassword, IConfiguration configuration)
         {
-            _domain = domain;
             _adminUsername = adminUsername;
             _adminPassword = adminPassword;
-        }*/
+            _domain = configuration["AccountCreationSettings:myDomainName"];
 
-    /*    // ✅ ADDED: Helper to run any AD operation as the admin user
-        private void RunAsAdmin(Action action)
-        {
-            IntPtr adminToken = IntPtr.Zero;
-            try
-            {
-                bool success = LogonUser(
-                    _adminUsername,
-                    _domain,
-                    _adminPassword,
-                    LOGON32_LOGON_NEW_CREDENTIALS,
-                    LOGON32_PROVIDER_DEFAULT,
-                    out adminToken);
+            // Load all domain controllers from config — uses GetChildren() to avoid requiring Binder package
+            _domainControllers = configuration.GetSection("AccountCreationSettings:myDomainControllers")
+                                              .GetChildren()
+                                              .Select(c => c.Value)
+                                              .Where(v => !string.IsNullOrWhiteSpace(v))
+                                              .ToList();
 
-                if (!success)
-                    throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            if (_domainControllers.Count == 0)
+                Console.WriteLine("Warning: No domain controllers configured in Appsettings.json.".Pastel(Color.DarkGoldenrod));
+            else
+                Console.WriteLine($"Loaded {_domainControllers.Count} domain controller(s): {string.Join(", ", _domainControllers)}".Pastel(Color.DarkCyan));
+        }// end of SetAdminCredentials
 
-                using (WindowsIdentity adminIdentity = new WindowsIdentity(adminToken))
-                {
-                    WindowsIdentity.RunImpersonated(adminIdentity.AccessToken, action);
-                }
-            }
-            finally
-            {
-                if (adminToken != IntPtr.Zero)
-                    CloseHandle(adminToken);
-            }
-        }
-*/
         /// <summary>
         /// A method that display a general information about a user.
         /// </summary>
@@ -112,9 +80,17 @@ namespace ADUtils
                         string title = directoryEntry.Properties["title"].Value as string;
                         string department = directoryEntry.Properties["department"].Value as string;
 
-                        // TODO - Make a check if the password or last logon date are null                        
+                        string lastBadPwd = user.LastBadPasswordAttempt.HasValue
+                            ? TimeZoneInfo.ConvertTimeFromUtc(user.LastBadPasswordAttempt.Value.ToUniversalTime(), TimeZoneInfo.Local).ToString()
+                            : "N/A";
+
+                        string lastLogon = user.LastLogon.HasValue
+                            ? TimeZoneInfo.ConvertTimeFromUtc(user.LastLogon.Value.ToUniversalTime(), TimeZoneInfo.Local).ToString()
+                            : "N/A";
+
+/*                        // TODO - Make a check if the password or last logon date are null                        
                         DateTime lastBadPasswordAttemptLocal = TimeZoneInfo.ConvertTimeFromUtc(user.LastBadPasswordAttempt.Value.ToUniversalTime(), TimeZoneInfo.Local);
-                        DateTime lastLogonLocal = TimeZoneInfo.ConvertTimeFromUtc(user.LastLogon.Value.ToUniversalTime(), TimeZoneInfo.Local);
+                        DateTime lastLogonLocal = TimeZoneInfo.ConvertTimeFromUtc(user.LastLogon.Value.ToUniversalTime(), TimeZoneInfo.Local);*/
                         
                         Console.WriteLine($"\nFirst name: {user.GivenName ?? "N/A"}\n" +
                                           $"Last name: {user.Surname ?? "N/A"}\n" +
@@ -127,8 +103,8 @@ namespace ADUtils
                                           $"Password Last Set: {passwordManager.GetPasswordLastSetDate(user)}\n" +
                                           $"Password Experation Date: {passwordManager.GetPasswordExpirationDate(user)}\n" +
                                           $"Bad Logon Counter: {user.BadLogonCount}\n" +
-                                          $"Last Logon: {lastLogonLocal}\n" +
-                                          $"Last Bad Logon Attempt: {lastBadPasswordAttemptLocal}\n" +
+                                          $"Last Logon: {lastLogon}\n" +
+                                          $"Last Bad Logon Attempt: {lastBadPwd}\n" +
                                           $"Account Status: {user.Enabled}\n" +
                                           $"Account Lockout Status: {user.IsAccountLockedOut()}\n" +
                                           $"Home Directory: {user.HomeDirectory ?? "N/A"}\n" +
@@ -200,7 +176,7 @@ namespace ADUtils
                 foreach (var result in searcher.FindAll())
                 {
                     UserPrincipal user = result as UserPrincipal;
-                    if(!user.IsAccountLockedOut())
+                    if (user == null || !user.IsAccountLockedOut())
                     {
                         continue;
                     }
@@ -367,7 +343,7 @@ namespace ADUtils
                     foreach (var result in searcher.FindAll())                                                                                      // Look through what is in the user search object
                     {
                         UserPrincipal user = result as UserPrincipal;
-                        if(!user.IsAccountLockedOut() || user == null)
+                        if (user == null || !user.IsAccountLockedOut())
                         {
                             continue;
                         }
@@ -417,5 +393,119 @@ namespace ADUtils
                 }// end of catch
           //  });
         }// end of CheckLockedAccounts
+
+        /// <summary>
+        /// Searches all configured domain controllers for Event ID 4740 to find
+        /// which workstation caused the lockout for the given username.
+        /// Returns the first match found across all DCs.
+        /// </summary>
+        private string GetWorkstationNameFromEvent(string username)
+        {
+            if (string.IsNullOrEmpty(_adminUsername) || string.IsNullOrEmpty(_adminPassword))
+            {
+                Console.WriteLine("Admin credentials not set — cannot query event log.".Pastel(Color.DarkGoldenrod));
+                return "Unknown (no credentials)";
+            }
+
+            if (_domainControllers.Count == 0)
+            {
+                Console.WriteLine("No domain controllers configured in Appsettings.json.".Pastel(Color.DarkGoldenrod));
+                return "Unknown (no DCs configured)";
+            }
+
+            SecureString securePassword = new SecureString();
+            foreach (char c in _adminPassword)
+                securePassword.AppendChar(c);
+            securePassword.MakeReadOnly();
+
+            // Check each DC — return the first match found
+            foreach (string dc in _domainControllers)
+            {
+                Console.WriteLine($"Checking {dc} for lockout event...".Pastel(Color.DarkCyan));
+                try
+                {
+                    using var session = new EventLogSession(
+                        dc,
+                        _domain,
+                        _adminUsername,
+                        securePassword,
+                        SessionAuthentication.Default);
+
+                    EventLogQuery eventsQuery = new EventLogQuery("Security", PathType.LogName, "*[System[EventID=4740]]")
+                    {
+                        Session = session,
+                        ReverseDirection = true     // newest first
+                    };
+
+                    using var logReader = new EventLogReader(eventsQuery);
+
+                    int scanned = 0;
+                    for (EventRecord evt = logReader.ReadEvent();
+                         evt != null && scanned < 50;
+                         evt = logReader.ReadEvent(), scanned++)
+                    {
+                        using (evt)
+                        {
+                            string xml = evt.ToXml();
+                            if (xml.Contains(username, StringComparison.OrdinalIgnoreCase))
+                            {
+                                string callerName = ExtractXmlDataValue(xml, "CallerComputerName");
+                                if (!string.IsNullOrWhiteSpace(callerName))
+                                {
+                                    Console.WriteLine($"Lockout source found on {dc}.".Pastel(Color.DarkOliveGreen));
+                                    return callerName;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex) when (ex.Message.Contains("RPC server is unavailable") ||
+                                           ex.HResult == unchecked((int)0x800706BA))
+                {
+                    Console.WriteLine($"DC '{dc}' is unreachable (RPC unavailable) — skipping.".Pastel(Color.DarkGoldenrod));
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    Console.WriteLine($"Access denied on '{dc}' — skipping.".Pastel(Color.DarkOrange));
+                }
+                catch (EventLogNotFoundException)
+                {
+                    Console.WriteLine($"Security log not found on '{dc}' — skipping.".Pastel(Color.DarkGoldenrod));
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error querying '{dc}': {ex.Message} — skipping.".Pastel(Color.DarkOrange));
+                }
+            }
+
+            Console.WriteLine($"Lockout source for '{username}' not found on any DC.".Pastel(Color.DarkGoldenrod));
+            return "Unknown";
+        }// end of GetWorkstationNameFromEvent
+
+        /// <summary>
+        /// Extracts the value of a named Data element from a Windows Event XML string.
+        /// </summary>
+        /// <param name="xml">The raw event XML.</param>
+        /// <param name="dataName">The Name attribute to look for (e.g. "CallerComputerName").</param>
+        /// <returns>The inner text value, or null if not found.</returns>
+        private string ExtractXmlDataValue(string xml, string dataName)
+        {
+            try
+            {
+                string startTag = $"Name='{dataName}'>";
+                int startIndex = xml.IndexOf(startTag, StringComparison.OrdinalIgnoreCase);
+                if (startIndex == -1) return null;
+
+                startIndex += startTag.Length;
+                int endIndex = xml.IndexOf('<', startIndex);
+                if (endIndex == -1) return null;
+
+                return xml[startIndex..endIndex].Trim();
+            }
+            catch
+            {
+                return null;
+            }
+        }// end of ExtractXmlDataValue
     }// end of class
 }// end of spacename

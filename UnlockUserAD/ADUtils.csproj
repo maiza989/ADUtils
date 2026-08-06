@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Platforms>AnyCPU;x64</Platforms>
+    <Configurations>Debug;Release;wowee;Debug-2</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,14 +14,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <COMReference Include="ActiveDs">
+    <COMReference Include="{97d25db0-0363-11cf-abc4-02608c9e7553}">
       <WrapperTool>tlbimp</WrapperTool>
       <VersionMinor>0</VersionMinor>
       <VersionMajor>1</VersionMajor>
       <Guid>97d25db0-0363-11cf-abc4-02608c9e7553</Guid>
-      <Lcid>0</Lcid>
-      <Isolated>false</Isolated>
-      <EmbedInteropTypes>true</EmbedInteropTypes>
+      <Private>True</Private>
+      <EmbedInteropTypes>False</EmbedInteropTypes>
     </COMReference>
   </ItemGroup>
 
@@ -28,6 +28,10 @@
     <Content Include="Appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="UnlockUserAD.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -46,6 +50,12 @@
     <PackageReference Include="System.Management.Automation" Version="7.4.3" />
     <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.0" />
     <PackageReference Include="Yubico.YubiKey" Version="1.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="activeds.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

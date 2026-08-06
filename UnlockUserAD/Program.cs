@@ -89,6 +89,7 @@ class Program
                         ADGroupManager = new ADGroupActionManager(auditLogManager);
                         PWDManager = new PasswordManager(auditLogManager);
                         ACManager = new AccountCreationManager(auditLogManager, configuration);
+                        ADManager.SetAdminCredentials(adminUsername, adminPassword, configuration);
 
                         bool exit = false;
                         while (!exit)                                                                                                                                          // Loop the menu
@@ -101,12 +102,14 @@ class Program
                     context.Dispose();
                 }// end of using
             }// end of try
-            catch (DirectoryServicesCOMException)                                                                                                                              // Error out if password/username are incorrect
+            catch (DirectoryServicesCOMException) // error out of user credentials are wrong or account is locked
             {
+                isAuthenticated = false; // reset so the loop retries credentials
                 Console.WriteLine("Error: Unable to connect to the Active Directory server. Please check your credentials and try again.".Pastel(Color.IndianRed));
             }
             catch (Exception ex)
             {
+                isAuthenticated = false; // reset so the loop retries credentials
                 Console.WriteLine($"An error occurred: {ex.Message}".Pastel(Color.IndianRed));
             }// end of Catch
         } while (!isAuthenticated || string.IsNullOrEmpty(adminUsername));                                                                                                                                            // Repeat until a valid password is entered

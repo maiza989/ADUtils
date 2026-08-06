@@ -117,7 +117,21 @@ namespace ADUtils
         Region = "GA", Role = "Acct",
         Groups = new List<string> { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "LM_Accounting", "NoAccountingEmail", "Horizon_Accounting_RDS_Users", "BRP_Staff_Horizon_User" }
     },
-
+    new GroupAssignmentModel
+    {
+        Region = "GA", Role = "Call_Center",
+        Groups = new List<string> { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "Collectors", "LM_Collector", "NoOutboundEmail", "Horizon_Collector_RDS_Users", "BRP_Staff_Horizon_User" }
+    },
+    new GroupAssignmentModel
+    {
+        Region = "GA", Role = "GA_Staff",
+        Groups = new List<string> { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "Administrative", "Staff", "Horizon_RDS_Desktop_Users", "BRP_Staff_Horizon_User" }
+    },
+    new GroupAssignmentModel
+    {
+        Region = "GA", Role = "Accounting",
+        Groups = new List<string> { "_COLLECT", "_Training", "CW_AllUsers", "_COLLECTGA", "LM_Accounting", "NoAccountingEmail", "Horizon_Accounting_RDS_Users", "BRP_Staff_Horizon_User" }
+    },
 
     // KY Remote (optional if different from KY standard)
     new GroupAssignmentModel
