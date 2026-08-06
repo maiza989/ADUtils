@@ -37,12 +37,12 @@ namespace ADUtils
                     try
                     {
                         UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);              // Search for specific user using username
-                        if(user != null)
+                        if (user != null)
                         {
                             var groups = user.GetGroups();                                                                              // Get all group user is member of
-                            foreach (var group in groups )
+                            foreach (var group in groups)
                             {
-                                if(group.Name != "Domain Users" && group is GroupPrincipal)                                             // Remove all group except 'Domain User'
+                                if (group.Name != "Domain Users" && group is GroupPrincipal)                                             // Remove all group except 'Domain User'
                                 {
                                     GroupPrincipal groupPrincipal = (GroupPrincipal)group;
                                     groupPrincipal.Members.Remove(user);
@@ -61,7 +61,7 @@ namespace ADUtils
                                 {
                                     DirectoryEntry startOU = new DirectoryEntry(userEntry.Path);
                                     DirectoryEntry endOU = new DirectoryEntry(ouPath, adminUsername, adminPassword);
-                                    
+
                                     userEntry.CommitChanges();
                                     startOU.MoveTo(endOU);
                                     Console.WriteLine($"User account '{username}' has been moved to Ex Employee OU".Pastel(Color.LimeGreen));
@@ -78,12 +78,12 @@ namespace ADUtils
                             Console.WriteLine($"\tUser account '{username}' not found in Active Directory.".Pastel(Color.IndianRed));
                         }// end of else statement
                     }// end of try
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         Console.WriteLine($"Error deactivating user '{username}': {ex.Message}".Pastel(Color.Crimson));
                     }// end of catch
                 }// end of else statement
-            } while(!returnToMenu);   
+            } while (!returnToMenu);
             if (emailActionLog.Count > 0)
             {
                 string emailBody = string.Join("\n", emailActionLog);

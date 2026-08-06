@@ -13,6 +13,7 @@
     <None Remove="Appsettings.json" />
   </ItemGroup>
 
+  
   <ItemGroup>
     <COMReference Include="{97d25db0-0363-11cf-abc4-02608c9e7553}">
       <WrapperTool>tlbimp</WrapperTool>
@@ -23,7 +24,6 @@
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </COMReference>
   </ItemGroup>
-
   <ItemGroup>
     <Content Include="Appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

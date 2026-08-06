@@ -67,10 +67,10 @@ namespace ADUtils
                 else
                 {
                     UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
-                    if(user != null)
+                    if (user != null)
                     {
                         var groups = user.GetGroups();
-                        foreach(var group in groups)
+                        foreach (var group in groups)
                         {
                             userGroups.Add(group.Name);
                         }// end of foreach
@@ -110,17 +110,17 @@ namespace ADUtils
                                           $"Home Directory: {user.HomeDirectory ?? "N/A"}\n" +
                                           $"SID: {user.Sid}\n" +
                                           $"");
-                                          
+
                     }// end of if statement
                 }// end of else statement
                 userGroups.Clear();
-            }while (!returnToMenu);
+            } while (!returnToMenu);
         }// end of DisplayUserInfo
         /// <summary>
         /// A method to unlock one sepcific user.
         /// </summary>
         /// <param name="context">Based in what the computer domain</param>
-        public void UnlockUser(PrincipalContext context)                                                                                      
+        public void UnlockUser(PrincipalContext context)
         {
             bool returnToMenu = false;
             do
@@ -145,7 +145,7 @@ namespace ADUtils
                                 Console.WriteLine($"\tUser account '{username}' has been unlocked.".Pastel(Color.LimeGreen));
                             }// end of inner-if-statement
                             else
-                            {                               
+                            {
                                 Console.WriteLine($"\tUser account '{username}' is not locked.".Pastel(Color.OrangeRed));
                             }// end of else-statement
                         }// end of Outter-if-statement
@@ -166,7 +166,7 @@ namespace ADUtils
         /// A method to go through every user in Active Directory and unlock all of them if any is locked.
         /// </summary>
         /// <param name="context">Based in what the computer domain</param>
-        public void UnlockAllUsers(PrincipalContext context)                                                                           
+        public void UnlockAllUsers(PrincipalContext context)
         {
             try
             {
@@ -192,7 +192,7 @@ namespace ADUtils
                     Console.WriteLine("\tNo user accounts were locked.".Pastel(Color.DarkGoldenrod));
                 }// end of if-statement
                 else
-                {  
+                {
                     Console.WriteLine("\nAll user accounts have been unlocked successfully.".Pastel(Color.DarkCyan));
                 }// end of else-statement
             }// end of Try-Catch
@@ -331,7 +331,7 @@ namespace ADUtils
         /// A method to check if any user is locked in Active Directory.
         /// </summary>
         /// <param name="context">Based in what the computer domain</param>
-        public void CheckLockedAccounts(PrincipalContext context)                                                                        
+        public void CheckLockedAccounts(PrincipalContext context)
         {
            // RunAsAdmin(() =>
            // {

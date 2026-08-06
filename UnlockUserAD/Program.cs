@@ -71,10 +71,10 @@ class Program
         Console.WriteLine("Starting Active Directory Manager...");
 
         do
-        { 
+        {
             try
             {
-                GetAdminCreditials(); 
+                GetAdminCreditials();
 
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, _myDomainName, adminUsername, adminPassword))                                                               // Check if the the password/user are correct
                 {
@@ -115,7 +115,7 @@ class Program
         } while (!isAuthenticated || string.IsNullOrEmpty(adminUsername));                                                                                                                                            // Repeat until a valid password is entered
     }// end of Main Method
 
-   
+
     //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     //                                                                                                          UI
     //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -292,7 +292,7 @@ class Program
                     ACManager.CreateUserAccount(adminUsername, adminPassword);
                     break;
                 case "5":
-                   ACCDeactivationManager.DeactivateUserAccount(context, adminUsername, adminPassword);
+                    ACCDeactivationManager.DeactivateUserAccount(context, adminUsername, adminPassword);
                     break;
                 case "exit":
                     exit = true;
@@ -309,5 +309,5 @@ class Program
     {
 
     }
-   
+
 }// end of class
