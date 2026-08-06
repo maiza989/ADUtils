@@ -122,24 +122,29 @@ namespace ADUtils
                                 ? TimeZoneInfo.ConvertTimeFromUtc(user.LastLogon.Value.ToUniversalTime(), TimeZoneInfo.Local).ToString()
                                 : "N/A";
 
-                            AppLog.Screen($"\nFirst name: {user.GivenName ?? "N/A"}\n" +
-                                              $"Last name: {user.Surname ?? "N/A"}\n" +
-                                              $"Display name: {user.DisplayName ?? "N/A"}\n" +
-                                              $"Username: {user.SamAccountName ?? "N/A"}\n" +
-                                              $"Email: {user.EmailAddress ?? "N/A"}\n" +
-                                              $"Title: {title}\n" +
-                                              $"Department: {department}\n" +
-                                              $"Member of: {userGroupsString}\n" +
-                                              $"Password Last Set: {passwordManager.GetPasswordLastSetDate(user)}\n" +
-                                              $"Password Expiration Date: {passwordManager.GetPasswordExpirationDate(user)}\n" +
-                                              $"Bad Logon Counter: {user.BadLogonCount}\n" +
-                                              $"Last Logon: {lastLogon}\n" +
-                                              $"Last Bad Logon Attempt: {lastBadPwd}\n" +
-                                              $"Account Status: {user.Enabled}\n" +
-                                              $"Account Lockout Status: {user.IsAccountLockedOut()}\n" +
-                                              $"Home Directory: {user.HomeDirectory ?? "N/A"}\n" +
-                                              $"SID: {user.Sid}\n" +
-                                              $"");
+                            DateTime expires = passwordManager.GetPasswordExpirationDate(user);
+                            bool locked = user.IsAccountLockedOut();
+
+                            ConsoleUi.Panel($"{user.SamAccountName} {(user.DisplayName != null ? "· " + user.DisplayName : "")}".Trim(), new[]
+                            {
+                                ("First name", user.GivenName ?? "N/A"),
+                                ("Last name", user.Surname ?? "N/A"),
+                                ("Email", user.EmailAddress ?? "N/A"),
+                                ("Title", title),
+                                ("Department", department),
+                                ("Account", ConsoleUi.State(user.Enabled == true, user.Enabled == true ? "Enabled" : "DISABLED")),
+                                ("Lockout", ConsoleUi.State(!locked, locked ? "LOCKED" : "Not locked")),
+                                ("Password set", passwordManager.GetPasswordLastSetDate(user)?.ToString("yyyy-MM-dd HH:mm") ?? "N/A"),
+                                ("Password expires", user.PasswordNeverExpires ? "never"
+                                                     : expires == DateTime.MinValue ? "unknown"
+                                                     : expires.ToString("yyyy-MM-dd")),
+                                ("Bad logon count", user.BadLogonCount.ToString()),
+                                ("Last logon", lastLogon),
+                                ("Last bad logon", lastBadPwd),
+                                ("Home directory", user.HomeDirectory ?? "N/A"),
+                                ("SID", user.Sid?.ToString() ?? "N/A"),
+                                ("Member of", userGroupsString)
+                            });
                         }// end of if statement
                         else
                         {
@@ -708,6 +713,128 @@ namespace ADUtils
             }
         }// end of QueryLockoutEvent
 
+        /// <summary>One Event 4740 record.</summary>
+        private sealed class LockoutEvent
+        {
+            public DateTime When { get; init; }
+            public string Account { get; init; }
+            public string Caller { get; init; }
+            public string DomainController { get; init; }
+        }
+
+        /// <summary>
+        /// All Event 4740 records from the last N hours across every reachable DC.
+        /// Same transport as the single-user lookup, without the TargetUserName filter.
+        /// </summary>
+        /// <returns>The events, or null when the log could not be read at all.</returns>
+        private List<LockoutEvent> QueryRecentLockoutEvents(int hours)
+        {
+            if (!AdminSession.IsSet)
+            {
+                ConsoleUi.Warn("Admin credentials not set — cannot read the Security log.");
+                return null;
+            }
+
+            var reachable = GetReachableDomainControllers();
+            if (reachable.Count == 0) return null;
+
+            long windowMs = (long)TimeSpan.FromHours(hours).TotalMilliseconds;
+            string xpath = $"*[System[EventID=4740 and TimeCreated[timediff(@SystemTime) <= {windowMs}]]]";
+
+            ConsoleUi.Note($"Querying {reachable.Count} DC(s) for lockouts in the last {hours}h: {string.Join(", ", reachable)}");
+
+            try
+            {
+                using Runspace runspace = RunspaceFactory.CreateRunspace();
+                runspace.Open();
+                using PowerShell ps = PowerShell.Create();
+                ps.Runspace = runspace;
+
+                ps.AddCommand("Invoke-Command");
+                ps.AddParameter("ComputerName", reachable.ToArray());
+                ps.AddParameter("Credential", AdminSession.CreatePsCredential());
+                ps.AddParameter("ScriptBlock", ScriptBlock.Create(@"
+                    Get-WinEvent -LogName Security -FilterXPath $args[0] -MaxEvents 500 -ErrorAction SilentlyContinue |
+                        Select-Object TimeCreated, @{ n = 'Xml'; e = { $_.ToXml() } }"));
+                ps.AddParameter("ArgumentList", new object[] { xpath });
+
+                var results = ps.Invoke();
+
+                foreach (var e in ps.Streams.Error)
+                {
+                    AppLog.Detail($"WinRM error: {e.Exception?.Message ?? e.ToString()}");
+                }
+
+                if (results == null || results.Count == 0)
+                {
+                    if (ps.Streams.Error.Count > 0)
+                    {
+                        _eventLogBlocked = true;
+                        PrintEventLogBlockedHelp();
+                        return null;
+                    }
+                    return new List<LockoutEvent>();
+                }
+
+                var events = new List<LockoutEvent>();
+                foreach (PSObject result in results)
+                {
+                    string xml = result.Properties["Xml"]?.Value as string;
+                    if (string.IsNullOrWhiteSpace(xml)) continue;
+
+                    string account = ExtractXmlDataValue(xml, "TargetUserName");
+                    string caller = ExtractXmlDataValue(xml, "CallerComputerName");
+                    if (string.IsNullOrWhiteSpace(account)) continue;
+
+                    events.Add(new LockoutEvent
+                    {
+                        When = result.Properties["TimeCreated"]?.Value is DateTime dt ? dt : DateTime.MinValue,
+                        Account = account,
+                        Caller = string.IsNullOrWhiteSpace(caller) ? "unknown" : caller.TrimStart('\\'),
+                        DomainController = result.Properties["PSComputerName"]?.Value as string ?? "?"
+                    });
+                }
+                return events;
+            }
+            catch (Exception ex)
+            {
+                ConsoleUi.Fail($"Could not read lockout events: {ex.Message}", ex);
+                return null;
+            }
+        }// end of QueryRecentLockoutEvents
+
+        /// <summary>
+        /// Configured/discovered DCs filtered to those answering on the WinRM port, probed
+        /// concurrently so one dead DC costs a single timeout rather than one each.
+        /// </summary>
+        private List<string> GetReachableDomainControllers()
+        {
+            var candidates = BuildDomainControllerSearchOrder();
+            if (candidates.Count == 0)
+            {
+                ConsoleUi.Warn("No domain controllers could be discovered or configured.");
+                return new List<string>();
+            }
+
+            var probes = candidates.Select(dc => new { Dc = dc, Open = Task.Run(() => IsWinRmPortOpen(dc)) }).ToList();
+            Task.WaitAll(probes.Select(p => p.Open).ToArray());
+
+            var reachable = new List<string>();
+            foreach (var probe in probes)
+            {
+                if (probe.Open.Result) reachable.Add(probe.Dc);
+                else ConsoleUi.Note($"{probe.Dc}: WinRM not reachable — skipped.");
+            }
+
+            if (reachable.Count == 0)
+            {
+                ConsoleUi.Fail("None of the domain controllers are reachable over WinRM.");
+                _eventLogBlocked = true;
+                PrintEventLogBlockedHelp();
+            }
+            return reachable;
+        }// end of GetReachableDomainControllers
+
         /// <summary>
         /// Builds the PSCredential for remoting from the credentials captured at login.
         ///
@@ -826,6 +953,237 @@ namespace ADUtils
                 return false;
             }
         }// end of IsWinRmPortOpen
+
+        // -----------------------------------------------------------------------------------------
+        //                                        Search
+        // -----------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Finds users by partial name.
+        ///
+        /// Every other lookup in this tool demands an exact sAMAccountName, which is painful when
+        /// all you have from a phone call is a surname.
+        /// </summary>
+        public void FindUsers(PrincipalContext context)
+        {
+            bool returnToMenu = false;
+            do
+            {
+                ConsoleUi.PromptWithExit("Name, surname or username to search for");
+                string term = ConsoleInput.ReadTrimmed();
+
+                if (term.Equals("exit", StringComparison.OrdinalIgnoreCase)) { returnToMenu = true; continue; }
+                if (term.Length < 2)
+                {
+                    ConsoleUi.Warn("Enter at least two characters.");
+                    continue;
+                }
+
+                try
+                {
+                    // Three searches because PrincipalSearcher ANDs the properties set on the
+                    // template, so one template cannot express "name OR surname OR account".
+                    var matches = new SortedDictionary<string, UserPrincipal>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var template in new[]
+                    {
+                        new UserPrincipal(context) { Name = $"*{term}*" },
+                        new UserPrincipal(context) { Surname = $"*{term}*" },
+                        new UserPrincipal(context) { SamAccountName = $"*{term}*" }
+                    })
+                    {
+                        using (template)
+                        using (var searcher = new PrincipalSearcher(template))
+                        using (var results = searcher.FindAll())
+                        {
+                            foreach (var found in results)
+                            {
+                                if (found is UserPrincipal u && !string.IsNullOrEmpty(u.SamAccountName)
+                                    && !matches.ContainsKey(u.SamAccountName))
+                                {
+                                    matches[u.SamAccountName] = u;
+                                }
+                            }
+                        }
+                    }
+
+                    ConsoleUi.Table(
+                        new[] { "Username", "Display name", "Email", "Status" },
+                        matches.Values.Select(u => new[]
+                        {
+                            u.SamAccountName,
+                            u.DisplayName ?? "",
+                            u.EmailAddress ?? "",
+                            u.Enabled == true ? (u.IsAccountLockedOut() ? "LOCKED" : "Enabled") : "Disabled"
+                        }));
+                }
+                catch (Exception ex)
+                {
+                    ConsoleUi.Fail($"Search for '{term}' failed: {ex.Message}", ex);
+                }
+            } while (!returnToMenu);
+        }// end of FindUsers
+
+        // -----------------------------------------------------------------------------------------
+        //                                        Reports
+        // -----------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Disabled accounts whose "Delete on {date}" description has come due.
+        ///
+        /// Deactivation has always written that date into the description, but nothing ever read it
+        /// back, so the 31-day cleanup depended on somebody remembering. This closes that loop.
+        /// </summary>
+        public void ReportAccountsDueForDeletion(PrincipalContext context)
+        {
+            ConsoleUi.Breadcrumb("Main", "Reports", "Accounts Due for Deletion");
+            try
+            {
+                var rows = new List<(DateTime Due, string[] Cells)>();
+
+                using (var template = new UserPrincipal(context) { Enabled = false })
+                using (var searcher = new PrincipalSearcher(template))
+                using (var results = searcher.FindAll())
+                {
+                    foreach (var result in results)
+                    {
+                        using (result)
+                        {
+                            if (!(result is UserPrincipal user)) continue;
+
+                            DateTime? due = ParseDeletionDate(user.Description);
+                            if (due == null) continue;
+
+                            int daysLeft = (int)Math.Round((due.Value.Date - DateTime.Now.Date).TotalDays);
+                            rows.Add((due.Value, new[]
+                            {
+                                user.SamAccountName ?? "",
+                                user.DisplayName ?? "",
+                                due.Value.ToString("yyyy-MM-dd"),
+                                daysLeft <= 0 ? $"DUE ({-daysLeft}d ago)" : $"in {daysLeft}d"
+                            }));
+                        }
+                    }
+                }
+
+                // Oldest first: whatever is most overdue needs attention first.
+                ConsoleUi.Table(new[] { "Username", "Display name", "Delete on", "Status" },
+                                rows.OrderBy(r => r.Due).Select(r => r.Cells));
+
+                int overdue = rows.Count(r => r.Due.Date <= DateTime.Now.Date);
+                if (overdue > 0) ConsoleUi.Warn($"{overdue} account(s) are at or past their deletion date.");
+            }
+            catch (Exception ex)
+            {
+                ConsoleUi.Fail($"Could not build the deletion report: {ex.Message}", ex);
+            }
+        }// end of ReportAccountsDueForDeletion
+
+        /// <summary>
+        /// Reads the date out of the "Delete on MM-dd-yyyy" description that deactivation writes.
+        /// Tolerant of other separators and of extra text around it.
+        /// </summary>
+        private static DateTime? ParseDeletionDate(string description)
+        {
+            if (string.IsNullOrWhiteSpace(description)) return null;
+
+            var match = System.Text.RegularExpressions.Regex.Match(
+                description, @"delete\s*on\s*[: ]?\s*(\d{1,2})[-/](\d{1,2})[-/](\d{4})",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!match.Success) return null;
+
+            // The writer uses MM-dd-yyyy.
+            return int.TryParse(match.Groups[1].Value, out int month)
+                && int.TryParse(match.Groups[2].Value, out int day)
+                && int.TryParse(match.Groups[3].Value, out int year)
+                && month >= 1 && month <= 12 && day >= 1 && day <= 31
+                ? new DateTime(year, month, day)
+                : (DateTime?)null;
+        }// end of ParseDeletionDate
+
+        /// <summary>
+        /// Accounts whose password expires within a given number of days -- the calls this tool
+        /// exists to field, caught before they turn into lockouts.
+        /// </summary>
+        public void ReportPasswordsExpiringSoon(PrincipalContext context)
+        {
+            ConsoleUi.Breadcrumb("Main", "Reports", "Passwords Expiring Soon");
+
+            ConsoleUi.Prompt("Within how many days (Enter for 14)");
+            string input = ConsoleInput.ReadTrimmed();
+            int days = int.TryParse(input, out int parsed) && parsed > 0 ? parsed : 14;
+
+            try
+            {
+                var rows = new List<(DateTime When, string[] Cells)>();
+
+                using (var template = new UserPrincipal(context) { Enabled = true })
+                using (var searcher = new PrincipalSearcher(template))
+                using (var results = searcher.FindAll())
+                {
+                    foreach (var result in results)
+                    {
+                        using (result)
+                        {
+                            if (!(result is UserPrincipal user) || user.PasswordNeverExpires) continue;
+
+                            DateTime expires = passwordManager.GetPasswordExpirationDate(user);
+                            if (expires == DateTime.MinValue) continue;
+
+                            int daysLeft = (int)Math.Round((expires.Date - DateTime.Now.Date).TotalDays);
+                            if (daysLeft > days) continue;
+
+                            rows.Add((expires, new[]
+                            {
+                                user.SamAccountName ?? "",
+                                user.DisplayName ?? "",
+                                expires.ToString("yyyy-MM-dd"),
+                                daysLeft < 0 ? $"EXPIRED ({-daysLeft}d)" : daysLeft == 0 ? "TODAY" : $"{daysLeft}d"
+                            }));
+                        }
+                    }
+                }
+
+                ConsoleUi.Table(new[] { "Username", "Display name", "Expires", "In" },
+                                rows.OrderBy(r => r.When).Select(r => r.Cells));
+            }
+            catch (Exception ex)
+            {
+                ConsoleUi.Fail($"Could not build the expiry report: {ex.Message}", ex);
+            }
+        }// end of ReportPasswordsExpiringSoon
+
+        /// <summary>
+        /// Every account locked out recently, and the machine that did it.
+        ///
+        /// Reuses the WinRM Event 4740 sweep. Where "Find Lockout Source" answers "where was this
+        /// one user locked out", this answers "what is going on" -- one workstation appearing
+        /// against several accounts is the usual sign of a stale cached credential or a service
+        /// running under an old password.
+        /// </summary>
+        public void ReportRecentLockouts()
+        {
+            ConsoleUi.Breadcrumb("Main", "Reports", "Recent Lockouts");
+
+            ConsoleUi.Prompt("Look back how many hours (Enter for 24)");
+            string input = ConsoleInput.ReadTrimmed();
+            int hours = int.TryParse(input, out int parsed) && parsed > 0 ? parsed : 24;
+
+            var events = QueryRecentLockoutEvents(hours);
+            if (events == null) return;
+
+            ConsoleUi.Table(new[] { "When", "Account", "Locked out from", "DC" },
+                            events.OrderByDescending(e => e.When)
+                                  .Select(e => new[] { e.When.ToString("MM-dd HH:mm:ss"), e.Account, e.Caller, e.DomainController }));
+
+            var repeats = events.GroupBy(e => e.Caller, StringComparer.OrdinalIgnoreCase)
+                                .Where(g => g.Select(e => e.Account).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
+                                .ToList();
+            foreach (var group in repeats)
+            {
+                ConsoleUi.Warn($"'{group.Key}' locked out {group.Select(e => e.Account).Distinct(StringComparer.OrdinalIgnoreCase).Count()} " +
+                               "different accounts — check for a stale cached credential or a service account on that machine.");
+            }
+        }// end of ReportRecentLockouts
 
         /// <summary>
         /// Extracts the value of a named Data element from a Windows Event XML string.

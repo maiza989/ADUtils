@@ -830,7 +830,7 @@ namespace ADUtils
             Thread.Sleep(processSleepTimer);
             try
             {
-                using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
+                using (PrincipalContext context = AdminSession.CreateContext())
                 {
                     UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
                     if(user != null)

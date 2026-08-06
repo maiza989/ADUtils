@@ -33,6 +33,11 @@ class Program
 
     static void Main(string[] args)
     {
+        // Before any output: puts the console on UTF-8 so box-drawing and status glyphs render.
+        // A legacy code page best-fit-maps them instead, which silently turned em dashes into
+        // hyphens and would make the framing unreadable.
+        ConsoleUi.Initialize();
+
         try
         {
             configuration = new ConfigurationBuilder()
@@ -84,6 +89,10 @@ class Program
                     {
 
                         isAuthenticated = true;
+
+                        // Publish the credentials before constructing anything, so privileged AD
+                        // writes bind as this account rather than as the interactive user.
+                        AdminSession.Set(adminUsername, adminPassword, configuration);
                         AppLog.Info($"Connected to Active Directory as: {context.UserName}.", Color.GreenYellow);
 
                         auditLogManager = new AuditLogManager(adminUsername, configuration);
@@ -136,13 +145,14 @@ class Program
     //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     static void DisplayMainMenu()
     {
-
-        AppLog.Screen("\nSelect an option:");
-        AppLog.Screen("1. Locked Out Management");
-        AppLog.Screen("2. Group Management");
-        AppLog.Screen("3. User Information Management");
-        AppLog.Screen("4. Exit");
-        AppLog.Prompt("Enter your choice: ");
+        ConsoleUi.Header();
+        ConsoleUi.Menu("Main Menu",
+            "Locked Out Management",
+            "Group Management",
+            "User Information",
+            "Reports",
+            "Exit");
+        ConsoleUi.Prompt("Choice");
     }// end of DisplayMainMenu
 
     /// <summary>
@@ -168,12 +178,15 @@ class Program
                 DisplayUserInfoMenu(context, ADManager, PWDManager, ACManager, ACCDeactivationManager);
                 break;
             case "4":
+                DisplayReportsMenu(context, ADManager);
+                break;
+            case "5":
                 return true;
             case "clear":
                 Console.Clear();
                 break;
             default:
-                AppLog.Warn("Invalid option. Please try again.", color: Color.IndianRed);
+                ConsoleUi.Warn("Invalid option. Please try again.");
                 break;
         }// end of switch case
         return false;
@@ -189,12 +202,14 @@ class Program
         bool exit = false;
         while (!exit)
         {
-            AppLog.Screen("\nLocked Out Manager:");
-            AppLog.Screen("1. Unlock a Specific User");
-            AppLog.Screen("2. Check All Locked Accounts");
-            AppLog.Screen("3. Unlock All Locked Accounts");
-            AppLog.Screen("4. Find Lockout Source for a User");
-            AppLog.Prompt($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
+            ConsoleUi.Breadcrumb("Main", "Locked Out Management");
+            ConsoleUi.Menu("Locked Out Manager",
+                "Unlock a Specific User",
+                "Check All Locked Accounts",
+                "Unlock All Locked Accounts",
+                "Find Lockout Source for a User");
+            ConsoleUi.PromptWithExit("Choice");
+
             string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
             {
@@ -214,7 +229,7 @@ class Program
                     exit = true;
                     break;
                 default:
-                    AppLog.Warn("Invalid option. Please try again.", color: Color.IndianRed);
+                    ConsoleUi.Warn("Invalid option. Please try again.");
                     break;
             }// end of switch-case
         }// end of while
@@ -231,14 +246,16 @@ class Program
         bool exit = false;
         while (!exit)
         {
-            AppLog.Screen("\nGroup Management:");
-            AppLog.Screen("1. List All Groups in Active Directory");
-            AppLog.Screen("2. Add User to a Group");
-            AppLog.Screen("3. Remove User From a Group");
-            AppLog.Screen("4. Add User to a Shared Mailbox");
-            AppLog.Screen("5. Remove User From a Shared Mailbox");
-            AppLog.Screen("6. Check Who is Member in a Group");
-            AppLog.Prompt($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
+            ConsoleUi.Breadcrumb("Main", "Group Management");
+            ConsoleUi.Menu("Group Management",
+                "List All Groups in Active Directory",
+                "Add User to a Group",
+                "Remove User From a Group",
+                "Grant Shared Mailbox Access",
+                "Revoke Shared Mailbox Access",
+                "Check Who is Member in a Group",
+                "Copy Groups From Another User");
+            ConsoleUi.PromptWithExit("Choice");
 
             string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
@@ -261,11 +278,14 @@ class Program
                 case "6":
                     ADGroupManager.ListGroupMembers(context);
                     break;
+                case "7":
+                    ADGroupManager.CopyGroupsFromUser(context);
+                    break;
                 case "exit":
                     exit = true;
                     break;
                 default:
-                    AppLog.Warn("Invalid option. Please try again.", color: Color.IndianRed);
+                    ConsoleUi.Warn("Invalid option. Please try again.");
                     break;
             }// end of switch-case
         }// end of while loop
@@ -283,13 +303,15 @@ class Program
         bool exit = false;
         while (!exit)
         {
-            AppLog.Screen("\nUser Information:");
-            AppLog.Screen("1. Check User Password Expiration Date");
-            AppLog.Screen("2. Display General User Info");
-            AppLog.Screen("3. Reset A User Password");
-            AppLog.Screen("4. Create New User Account");
-            AppLog.Screen("5. Disable User Account");
-            AppLog.Prompt($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
+            ConsoleUi.Breadcrumb("Main", "User Information");
+            ConsoleUi.Menu("User Information",
+                "Check User Password Expiration Date",
+                "Display General User Info",
+                "Reset A User Password",
+                "Create New User Account",
+                "Disable User Account",
+                "Find a User (partial name search)");
+            ConsoleUi.PromptWithExit("Choice");
 
             string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
@@ -309,20 +331,57 @@ class Program
                 case "5":
                     ACCDeactivationManager.DeactivateUserAccount(context, adminUsername, adminPassword);
                     break;
+                case "6":
+                    ADManager.FindUsers(context);
+                    break;
                 case "exit":
                     exit = true;
                     break;
                 default:
-                    AppLog.Warn("Invalid option. Please try again.", color: Color.IndianRed);
+                    ConsoleUi.Warn("Invalid option. Please try again.");
                     break;
             }// end of switch-case
         }// end of while loop
         Console.Clear();
     }// end of DisplayUserInfoMenu
 
-    static void DisplayUserCreationMenu()
+    /// <summary>
+    /// Read-only reports. Grouped separately from the action menus so it is obvious that nothing
+    /// here changes anything.
+    /// </summary>
+    static void DisplayReportsMenu(PrincipalContext context, ActiveDirectoryManager ADManager)
     {
+        bool exit = false;
+        while (!exit)
+        {
+            ConsoleUi.Breadcrumb("Main", "Reports");
+            ConsoleUi.Menu("Reports (read-only)",
+                "Accounts Due for Deletion",
+                "Passwords Expiring Soon",
+                "Recent Lockouts (all DCs)");
+            ConsoleUi.PromptWithExit("Choice");
 
-    }
+            string choice = ConsoleInput.ReadTrimmedLower();
+            switch (choice)
+            {
+                case "1":
+                    ADManager.ReportAccountsDueForDeletion(context);
+                    break;
+                case "2":
+                    ADManager.ReportPasswordsExpiringSoon(context);
+                    break;
+                case "3":
+                    ADManager.ReportRecentLockouts();
+                    break;
+                case "exit":
+                    exit = true;
+                    break;
+                default:
+                    ConsoleUi.Warn("Invalid option. Please try again.");
+                    break;
+            }// end of switch-case
+        }// end of while loop
+        Console.Clear();
+    }// end of DisplayReportsMenu
 
 }// end of class

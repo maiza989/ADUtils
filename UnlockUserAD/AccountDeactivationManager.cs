@@ -111,6 +111,11 @@ namespace ADUtils
                         emailActionLog.Add(moved
                             ? $"User account '{username}' has been disabled and moved to the {ACManager._myExEmployeeOU} OU.\nAccount will be deleted on '{deletionDateString}'"
                             : $"User account '{username}' has been disabled but *** COULD NOT BE MOVED *** to the {ACManager._myExEmployeeOU} OU — move it manually.\nAccount will be deleted on '{deletionDateString}'");
+
+                        // Disabling the account leaves the mailbox untouched, so mail to a departing
+                        // employee simply goes unanswered. Offered rather than automatic because
+                        // whether to auto-reply or hand the mailbox over is a per-departure decision.
+                        HandleDepartingMailbox(username, user.DisplayName ?? username);
                     }// end of try
                     catch (Exception ex)
                     {
@@ -125,5 +130,141 @@ namespace ADUtils
                 emailNotification.SendEmailNotification("ADUtil Action: Administrative Action in Active Directory", emailBody);
             }// end of if statement
         }// end of DeactivateUserAccount
+
+        /// <summary>
+        /// Offers the mailbox side of an offboarding: hide from the address book, set an
+        /// out-of-office reply, and hand access to a colleague.
+        ///
+        /// Each step is asked separately, and each is applied independently so one failure does not
+        /// abandon the rest. Anything that fails is reported and added to the notification, never
+        /// silently skipped.
+        /// </summary>
+        private void HandleDepartingMailbox(string username, string displayName)
+        {
+            if (!ConsoleUi.Confirm($"Also update the Exchange mailbox for '{username}'?"))
+            {
+                emailActionLog.Add($"Mailbox for '{username}' was left unchanged (skipped by operator).");
+                return;
+            }
+
+            bool hide = ConsoleUi.Confirm("Hide the mailbox from the address book (GAL)?");
+            bool autoReply = ConsoleUi.Confirm("Set an out-of-office auto-reply?");
+
+            string autoReplyText = null;
+            if (autoReply)
+            {
+                ConsoleUi.Prompt("Auto-reply message (Enter for a default)");
+                autoReplyText = ConsoleInput.ReadTrimmed();
+                if (autoReplyText.Length == 0)
+                {
+                    autoReplyText = $"{displayName} is no longer with the firm. " +
+                                    "Please direct your message to the appropriate department and we will assist you.";
+                }
+            }
+
+            string delegateTo = null;
+            if (ConsoleUi.Confirm("Grant a colleague full access to this mailbox?"))
+            {
+                ConsoleUi.Prompt("Colleague's username");
+                delegateTo = ConsoleInput.ReadTrimmed();
+                if (delegateTo.Length == 0) delegateTo = null;
+            }
+
+            if (!hide && !autoReply && delegateTo == null)
+            {
+                ConsoleUi.Note("Nothing selected — mailbox left unchanged.");
+                return;
+            }
+
+            try
+            {
+                using var exchange = new ExchangeSessionManager(Program.configuration);
+                if (!exchange.Connect())
+                {
+                    ConsoleUi.Fail($"Mailbox for '{username}' was NOT updated — no Exchange session.");
+                    emailActionLog.Add($"*** Mailbox for '{username}' could NOT be updated (no Exchange session) — handle it manually. ***");
+                    return;
+                }
+
+                // Add/Remove-ADPermission and Set-Mailbox disagree with SMTP addresses, so resolve
+                // once to a DN and use that throughout.
+                if (!exchange.TryResolveMailbox(username, out string mailboxDn, out string mailboxName))
+                {
+                    emailActionLog.Add($"*** No mailbox found for '{username}' — nothing was changed in Exchange. ***");
+                    return;
+                }
+
+                string dcParam = exchange.DomainController;
+
+                if (hide)
+                {
+                    var p = new Dictionary<string, object>
+                    {
+                        ["Identity"] = mailboxDn,
+                        ["HiddenFromAddressListsEnabled"] = true
+                    };
+                    if (dcParam != null) p["DomainController"] = dcParam;
+
+                    if (exchange.RunCommand("Set-Mailbox", $"hiding '{mailboxName}' from the GAL", p))
+                    {
+                        ConsoleUi.Ok($"'{mailboxName}' hidden from the address book.");
+                        emailActionLog.Add($"Mailbox '{mailboxName}' hidden from the global address list.");
+                    }
+                    else
+                    {
+                        emailActionLog.Add($"*** Could not hide mailbox '{mailboxName}' from the GAL — do it manually. ***");
+                    }
+                }
+
+                if (autoReply)
+                {
+                    var p = new Dictionary<string, object>
+                    {
+                        ["Identity"] = mailboxDn,
+                        ["AutoReplyState"] = "Enabled",
+                        ["InternalMessage"] = autoReplyText,
+                        ["ExternalMessage"] = autoReplyText
+                    };
+                    if (dcParam != null) p["DomainController"] = dcParam;
+
+                    if (exchange.RunCommand("Set-MailboxAutoReplyConfiguration", $"setting the auto-reply for '{mailboxName}'", p))
+                    {
+                        ConsoleUi.Ok($"Out-of-office reply set on '{mailboxName}'.");
+                        emailActionLog.Add($"Out-of-office auto-reply enabled on mailbox '{mailboxName}'.");
+                    }
+                    else
+                    {
+                        emailActionLog.Add($"*** Could not set the auto-reply on '{mailboxName}' — do it manually. ***");
+                    }
+                }
+
+                if (delegateTo != null)
+                {
+                    var p = new Dictionary<string, object>
+                    {
+                        ["Identity"] = mailboxDn,
+                        ["User"] = delegateTo,
+                        ["AccessRights"] = "FullAccess",
+                        ["InheritanceType"] = "All"
+                    };
+                    if (dcParam != null) p["DomainController"] = dcParam;
+
+                    if (exchange.RunCommand("Add-MailboxPermission", $"granting '{delegateTo}' access to '{mailboxName}'", p))
+                    {
+                        ConsoleUi.Ok($"'{delegateTo}' granted full access to '{mailboxName}'.");
+                        emailActionLog.Add($"'{delegateTo}' granted FullAccess to mailbox '{mailboxName}'.");
+                    }
+                    else
+                    {
+                        emailActionLog.Add($"*** Could not grant '{delegateTo}' access to '{mailboxName}' — do it manually. ***");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ConsoleUi.Fail($"Error updating the mailbox for '{username}': {ex.Message}", ex);
+                emailActionLog.Add($"*** Mailbox changes for '{username}' failed: {ex.Message} — handle it manually. ***");
+            }
+        }// end of HandleDepartingMailbox
     }// end of class
 }// end of namespace

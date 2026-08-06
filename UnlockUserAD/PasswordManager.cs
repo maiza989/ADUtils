@@ -33,7 +33,9 @@ namespace ADUtils
 
             try
             {
-                using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
+                // Bound as the admin account, not the interactive user -- otherwise the audit log
+                // names the admin while AD records whoever is logged into the workstation.
+                using (PrincipalContext context = AdminSession.CreateContext())
                 {
                     UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);                                           // Searching for the user in AD
 
@@ -56,8 +58,27 @@ namespace ADUtils
 
                                 user.SetPassword(password);
                                 user.Save();
-                                string logEntry = $"Password for \"{user}\" has been changed successfully";
-                                AppLog.Info(logEntry, Color.LimeGreen);
+
+                                // A reset password is spoken aloud or typed into a ticket, so it must
+                                // not stay valid. The new-hire path already did this; this one did
+                                // not, so a helpdesk reset left the temporary password good for the
+                                // full domain max password age.
+                                bool mustChange = false;
+                                try
+                                {
+                                    user.ExpirePasswordNow();
+                                    mustChange = true;
+                                }
+                                catch (Exception ex)
+                                {
+                                    ConsoleUi.Warn($"Could not flag the password for change at next logon: {ex.Message}");
+                                    ConsoleUi.Note("Tick 'User must change password at next logon' manually in ADUC.");
+                                }
+
+                                string logEntry = mustChange
+                                    ? $"Password for \"{user}\" reset; must be changed at next logon"
+                                    : $"Password for \"{user}\" reset; *** could NOT be flagged for change at next logon ***";
+                                ConsoleUi.Ok(logEntry);
                                 auditLogManager?.Log(logEntry); // null-safe: auditLogManager may be null when using default constructor
                                 user.Dispose();
                             }// end of if statement
@@ -139,7 +160,9 @@ namespace ADUtils
 
             try
             {
-                using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
+                // Bound as the admin account, not the interactive user -- otherwise the audit log
+                // names the admin while AD records whoever is logged into the workstation.
+                using (PrincipalContext context = AdminSession.CreateContext())
                 {
                     UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);                                           // Searching for the user in AD
 

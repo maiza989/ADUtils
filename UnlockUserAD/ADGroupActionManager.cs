@@ -174,7 +174,109 @@ namespace ADUtils
         }// end of RemoveUserFromGroup
 
         /// <summary>
-        /// Grants a user FullAccess and Send As on an on-prem Exchange shared mailbox.
+        /// Copies group membership from an existing user onto another.
+        ///
+        /// Onboarding otherwise depends entirely on the hardcoded region/role table in
+        /// GroupAssignmentHelper, which has already drifted twice -- KY-Remote was missing two roles
+        /// outright, and an older copy of the table granted groups the live one does not. Copying
+        /// from a real peer cannot go stale. Shows the diff and confirms before writing anything.
+        /// </summary>
+        public void CopyGroupsFromUser(PrincipalContext context)
+        {
+            emailActionLog.Clear();
+
+            ConsoleUi.PromptWithExit("Copy groups FROM (existing user)");
+            string sourceName = ConsoleInput.ReadTrimmed();
+            if (sourceName.Equals("exit", StringComparison.OrdinalIgnoreCase) || sourceName.Length == 0) return;
+
+            ConsoleUi.PromptWithExit("Copy groups TO (target user)");
+            string targetName = ConsoleInput.ReadTrimmed();
+            if (targetName.Equals("exit", StringComparison.OrdinalIgnoreCase) || targetName.Length == 0) return;
+
+            if (sourceName.Equals(targetName, StringComparison.OrdinalIgnoreCase))
+            {
+                ConsoleUi.Warn("Source and target are the same account.");
+                return;
+            }
+
+            try
+            {
+                UserPrincipal source = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, sourceName);
+                if (source == null) { ConsoleUi.Fail($"User '{sourceName}' not found in Active Directory."); return; }
+
+                UserPrincipal target = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, targetName);
+                if (target == null) { ConsoleUi.Fail($"User '{targetName}' not found in Active Directory."); return; }
+
+                var sourceGroups = source.GetGroups().OfType<GroupPrincipal>()
+                                         .Where(g => !string.IsNullOrEmpty(g.Name))
+                                         .ToDictionary(g => g.Name, StringComparer.OrdinalIgnoreCase);
+                var targetGroups = new HashSet<string>(
+                    target.GetGroups().OfType<GroupPrincipal>().Select(g => g.Name).Where(n => !string.IsNullOrEmpty(n)),
+                    StringComparer.OrdinalIgnoreCase);
+
+                // Primary group is implicit and cannot be added this way.
+                var toAdd = sourceGroups.Keys.Where(g => !targetGroups.Contains(g) && g != "Domain Users")
+                                             .OrderBy(g => g, StringComparer.OrdinalIgnoreCase).ToList();
+
+                ConsoleUi.Panel($"{sourceName} {"->"} {targetName}", new[]
+                {
+                    ($"{sourceName} groups", sourceGroups.Count.ToString()),
+                    ($"{targetName} groups", targetGroups.Count.ToString()),
+                    ("Already shared", string.Join(", ", sourceGroups.Keys.Where(targetGroups.Contains).OrderBy(g => g)) is { Length: > 0 } shared ? shared : "none"),
+                    ("Would be ADDED", toAdd.Count == 0 ? "none" : string.Join(", ", toAdd))
+                });
+
+                if (toAdd.Count == 0)
+                {
+                    ConsoleUi.Ok($"'{targetName}' already has every group '{sourceName}' has. Nothing to do.");
+                    return;
+                }
+
+                if (!ConsoleUi.Confirm($"Add {toAdd.Count} group(s) to '{targetName}'?"))
+                {
+                    ConsoleUi.Note("Cancelled — no changes made.");
+                    return;
+                }
+
+                int added = 0;
+                foreach (string groupName in toAdd)
+                {
+                    try
+                    {
+                        GroupPrincipal group = sourceGroups[groupName];
+                        group.Members.Add(target);
+                        group.Save();
+                        added++;
+                        ConsoleUi.Ok($"Added '{targetName}' to '{groupName}'.");
+                    }
+                    catch (Exception ex)
+                    {
+                        ConsoleUi.Fail($"Could not add '{targetName}' to '{groupName}': {ex.Message}", ex);
+                    }
+                }
+
+                if (added > 0)
+                {
+                    string logEntry = $"\"{targetName}\" added to {added} group(s) copied from \"{sourceName}\": " +
+                                      string.Join(", ", toAdd.Take(added));
+                    auditLogManager.Log(logEntry);
+                    emailActionLog.Add(logEntry);
+                }
+                if (added < toAdd.Count)
+                {
+                    ConsoleUi.Warn($"{toAdd.Count - added} group(s) could not be added — see above.");
+                }
+            }
+            catch (Exception ex)
+            {
+                ConsoleUi.Fail($"Error copying groups: {ex.Message}", ex);
+            }
+
+            SendActionLog(EmailSubject);
+        }// end of CopyGroupsFromUser
+
+        /// <summary>
+        /// Grants a user access to an on-prem Exchange shared mailbox.
         /// </summary>
         public void AddUserToSharedMailbox(PrincipalContext context)
         {
@@ -182,12 +284,47 @@ namespace ADUtils
         }// end of AddUserToSharedMailbox
 
         /// <summary>
-        /// Revokes a user's FullAccess and Send As on an on-prem Exchange shared mailbox.
+        /// Revokes a user's access to an on-prem Exchange shared mailbox.
         /// </summary>
         public void RemoveUserFromSharedMailbox(PrincipalContext context)
         {
             ChangeSharedMailboxAccess(context, granting: false);
         }// end of RemoveUserFromSharedMailbox
+
+        /// <summary>Which rights a shared-mailbox change should apply.</summary>
+        private enum MailboxRights
+        {
+            FullAccess,
+            SendAs,
+            Both
+        }
+
+        /// <summary>
+        /// Asks which rights to change. The two are independent in Exchange -- FullAccess lets you
+        /// open the mailbox, Send As lets you send from its address -- and plenty of cases want only
+        /// one, so applying both unconditionally was wrong.
+        /// </summary>
+        /// <returns>The selection, or null if the operator backed out.</returns>
+        private static MailboxRights? PromptForRights(string verb)
+        {
+            while (true)
+            {
+                ConsoleUi.Menu($"Which access to {verb}?",
+                    "Full Access  (open the mailbox)",
+                    "Send As      (send from its address)",
+                    "Both");
+                ConsoleUi.PromptWithExit("Choice");
+
+                switch (ConsoleInput.ReadTrimmedLower())
+                {
+                    case "1": return MailboxRights.FullAccess;
+                    case "2": return MailboxRights.SendAs;
+                    case "3": return MailboxRights.Both;
+                    case "exit": return null;
+                    default: ConsoleUi.Warn("Enter 1, 2, 3 or 'exit'."); break;
+                }
+            }
+        }// end of PromptForRights
 
         /// <summary>
         /// Shared implementation for granting and revoking shared-mailbox access.
@@ -205,29 +342,43 @@ namespace ADUtils
 
             do
             {
-                AppLog.Prompt($"Enter the username to {verb} access for (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                ConsoleUi.Breadcrumb("Main", "Group Management", $"{(granting ? "Grant" : "Revoke")} Shared Mailbox Access");
+
+                ConsoleUi.PromptWithExit($"Username to {verb} access for");
                 string username = ConsoleInput.ReadTrimmed();
                 if (username.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    AppLog.Screen("\nReturning to menu...");
+                    ConsoleUi.Note("Returning to menu...");
                     break;
                 }// end of if statement
 
-                AppLog.Prompt($"Enter the shared mailbox email or alias (Type {"'exit'".Pastel(Color.MediumPurple)} to go back to menu): ");
+                ConsoleUi.PromptWithExit("Shared mailbox email or alias");
                 string sharedMailbox = ConsoleInput.ReadTrimmed();
                 if (sharedMailbox.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 {
                     isExit = true;
-                    AppLog.Screen("\nReturning to menu...");
+                    ConsoleUi.Note("Returning to menu...");
                     break;
                 }// end of if statement
 
                 if (username.Length == 0 || sharedMailbox.Length == 0)
                 {
-                    AppLog.Warn("Both a username and a shared mailbox are required.", color: Color.DarkGoldenrod);
+                    ConsoleUi.Warn("Both a username and a shared mailbox are required.");
                     continue;
                 }
+
+                // FullAccess and Send As are independent rights in Exchange, and plenty of requests
+                // want only one of them, so ask rather than always applying both.
+                MailboxRights? rights = PromptForRights(verb);
+                if (rights == null)
+                {
+                    isExit = true;
+                    ConsoleUi.Note("Returning to menu...");
+                    break;
+                }
+                bool wantFullAccess = rights != MailboxRights.SendAs;
+                bool wantSendAs = rights != MailboxRights.FullAccess;
 
                 try
                 {
@@ -236,7 +387,7 @@ namespace ADUtils
                     UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
                     if (user == null)
                     {
-                        AppLog.Warn($"User '{username}' not found in Active Directory.", color: Color.IndianRed);
+                        ConsoleUi.Fail($"User '{username}' not found in Active Directory.");
                         continue;
                     }
 
@@ -244,7 +395,7 @@ namespace ADUtils
                     {
                         if (!exchange.Connect())
                         {
-                            AppLog.Warn($"Could not {verb} access — no Exchange session.", color: Color.IndianRed);
+                            ConsoleUi.Fail($"Could not {verb} access — no Exchange session.");
                             continue;
                         }
 
@@ -256,80 +407,95 @@ namespace ADUtils
                         {
                             continue;
                         }
-                        AppLog.Screen($"Resolved '{sharedMailbox}' to mailbox '{mailboxName}'.", Color.DarkCyan);
+                        ConsoleUi.Note($"Resolved '{sharedMailbox}' to mailbox '{mailboxName}'.");
 
-                        // FullAccess -- lets the user open the mailbox.
-                        var mailboxParams = new Dictionary<string, object>
-                        {
-                            ["Identity"] = mailboxDn,
-                            ["User"] = username,
-                            ["AccessRights"] = "FullAccess"
-                        };
-                        if (granting)
-                        {
-                            mailboxParams["InheritanceType"] = "All";
-                        }
-                        else
-                        {
-                            mailboxParams["Confirm"] = false;
-                        }
-                        if (exchange.DomainController != null)
-                        {
-                            mailboxParams["DomainController"] = exchange.DomainController;
-                        }
+                        // Only the rights the operator asked for are attempted. Anything not
+                        // requested stays null so it is never reported as a success or a failure.
+                        bool? fullAccessOk = null;
+                        bool? sendAsOk = null;
 
-                        bool fullAccessOk = exchange.RunCommand(
-                            granting ? "Add-MailboxPermission" : "Remove-MailboxPermission",
-                            $"{(granting ? "granting" : "revoking")} FullAccess on '{sharedMailbox}' for '{username}'",
-                            mailboxParams);
+                        if (wantFullAccess)
+                        {
+                            // FullAccess -- lets the user open the mailbox.
+                            var mailboxParams = new Dictionary<string, object>
+                            {
+                                ["Identity"] = mailboxDn,
+                                ["User"] = username,
+                                ["AccessRights"] = "FullAccess"
+                            };
+                            if (granting)
+                            {
+                                mailboxParams["InheritanceType"] = "All";
+                            }
+                            else
+                            {
+                                mailboxParams["Confirm"] = false;
+                            }
+                            if (exchange.DomainController != null)
+                            {
+                                mailboxParams["DomainController"] = exchange.DomainController;
+                            }
 
-                        // Send As -- on-prem uses an AD extended right, not Add-RecipientPermission.
-                        var sendAsParams = new Dictionary<string, object>
-                        {
-                            ["Identity"] = mailboxDn,
-                            ["User"] = username,
-                            ["ExtendedRights"] = "Send As",
-                            ["Confirm"] = false
-                        };
-                        if (exchange.DomainController != null)
-                        {
-                            sendAsParams["DomainController"] = exchange.DomainController;
+                            fullAccessOk = exchange.RunCommand(
+                                granting ? "Add-MailboxPermission" : "Remove-MailboxPermission",
+                                $"{(granting ? "granting" : "revoking")} FullAccess on '{sharedMailbox}' for '{username}'",
+                                mailboxParams);
                         }
 
-                        bool sendAsOk = exchange.RunCommand(
-                            granting ? "Add-ADPermission" : "Remove-ADPermission",
-                            $"{(granting ? "granting" : "revoking")} Send As on '{sharedMailbox}' for '{username}'",
-                            sendAsParams);
-
-                        if (!fullAccessOk && !sendAsOk)
+                        if (wantSendAs)
                         {
-                            AppLog.Warn($"Nothing was changed for '{username}' on '{sharedMailbox}'.", color: Color.IndianRed);
+                            // Send As -- on-prem uses an AD extended right, not Add-RecipientPermission.
+                            var sendAsParams = new Dictionary<string, object>
+                            {
+                                ["Identity"] = mailboxDn,
+                                ["User"] = username,
+                                ["ExtendedRights"] = "Send As",
+                                ["Confirm"] = false
+                            };
+                            if (exchange.DomainController != null)
+                            {
+                                sendAsParams["DomainController"] = exchange.DomainController;
+                            }
+
+                            sendAsOk = exchange.RunCommand(
+                                granting ? "Add-ADPermission" : "Remove-ADPermission",
+                                $"{(granting ? "granting" : "revoking")} Send As on '{sharedMailbox}' for '{username}'",
+                                sendAsParams);
+                        }
+
+                        if (fullAccessOk != true && sendAsOk != true)
+                        {
+                            ConsoleUi.Fail($"Nothing was changed for '{username}' on '{sharedMailbox}'.");
                             continue;
                         }
 
                         // Log only the rights that actually changed.
                         var changed = new List<string>();
-                        if (fullAccessOk) changed.Add("FullAccess");
-                        if (sendAsOk) changed.Add("Send As");
+                        if (fullAccessOk == true) changed.Add("FullAccess");
+                        if (sendAsOk == true) changed.Add("Send As");
 
                         string direction = granting ? "granted" : "revoked";
                         string preposition = granting ? "on" : "from";
-                        AppLog.Info($"{string.Join(" and ", changed)} {direction} for '{username}' {preposition} '{sharedMailbox}'.", Color.LimeGreen);
+                        ConsoleUi.Ok($"{string.Join(" and ", changed)} {direction} for '{username}' {preposition} '{mailboxName}'.");
 
-                        if (!fullAccessOk || !sendAsOk)
+                        // Only complain about a right that was actually requested and then failed.
+                        if (fullAccessOk == false)
                         {
-                            string missing = fullAccessOk ? "Send As" : "FullAccess";
-                            AppLog.Warn($"{missing} was NOT {direction} — apply it manually in Exchange.", color: Color.DarkGoldenrod);
+                            ConsoleUi.Warn($"FullAccess was NOT {direction} — apply it manually in Exchange.");
+                        }
+                        if (sendAsOk == false)
+                        {
+                            ConsoleUi.Warn($"Send As was NOT {direction} — apply it manually in Exchange.");
                         }
 
-                        string logEntry = $"\"{username}\" — {string.Join(" and ", changed)} {direction} {preposition} shared mailbox \"{sharedMailbox}\" in Exchange\n";
+                        string logEntry = $"\"{username}\" — {string.Join(" and ", changed)} {direction} {preposition} shared mailbox \"{mailboxName}\" in Exchange";
                         emailActionLog.Add(logEntry);
                         auditLogManager.Log(logEntry);
                     }// end of using
                 }// end of try
                 catch (Exception ex)
                 {
-                    AppLog.Error($"Error changing shared mailbox access: {ex.Message}", ex, Color.IndianRed);
+                    ConsoleUi.Fail($"Error changing shared mailbox access: {ex.Message}", ex);
                 }// end of catch
             } while (!isExit);
 
