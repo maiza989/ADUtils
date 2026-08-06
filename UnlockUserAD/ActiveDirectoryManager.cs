@@ -1,9 +1,10 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Pastel;
-using System.Diagnostics.Eventing.Reader;
 using System.DirectoryServices;
 using System.DirectoryServices.AccountManagement;
 using System.Drawing;
+using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 using System.Security;
 
 namespace ADUtils
@@ -12,11 +13,14 @@ namespace ADUtils
     public class ActiveDirectoryManager
     {
         /// <summary>
-        /// How long to wait on one DC's Security log before giving up. A firewall-blocked RPC call
-        /// takes ~21 seconds to fail on its own, which is far longer than an operator should wait
-        /// for an optional detail.
+        /// Budget for the whole WinRM lockout query across all reachable DCs.
+        ///
+        /// Generous on purpose: a Security log scan on a busy DC can take a while, and the cost of
+        /// setting this too low is a spurious "gave up" on a query that would have succeeded.
+        /// Unreachable DCs are already excluded by a fast port probe before this applies, and
+        /// genuine transport or authorization failures return in well under a second.
         /// </summary>
-        private const int LockoutLookupTimeoutSeconds = 8;
+        private const int LockoutLookupTimeoutSeconds = 30;
 
         /// <summary>
         /// How far back to search for the lockout event. Bounding this keeps the DC from scanning
@@ -32,8 +36,11 @@ namespace ADUtils
         private List<string> _domainControllers = new List<string>();
 
         /// <summary>
-        /// Set once the remote Security log is shown to be unreachable, so later lookups in the
-        /// same session fail instantly instead of paying the timeout again.
+        /// Set once the remote Security log is shown to be genuinely unreachable or the credentials
+        /// rejected, so later lookups in the same session fail instantly instead of re-probing.
+        ///
+        /// Deliberately not set by a query timeout — that is ambiguous, and caching it would
+        /// disable the feature for the session over one slow query.
         /// </summary>
         private bool _eventLogBlocked;
 
@@ -43,7 +50,8 @@ namespace ADUtils
             _adminPassword = adminPassword;
 
             // myDomainName holds a *domain controller* hostname (e.g. "LMDC2"), which is what
-            // PrincipalContext wants. EventLogSession needs the account's DOMAIN, so use myDomain.
+            // PrincipalContext wants. The WinRM credential needs the account's DOMAIN to qualify
+            // the username, so read myDomain instead.
             _domain = configuration["AccountCreationSettings:myDomain"];
 
             // Load all domain controllers from config — uses GetChildren() to avoid requiring Binder package
@@ -522,14 +530,31 @@ namespace ADUtils
             var candidates = BuildDomainControllerSearchOrder();
             if (candidates.Count == 0)
             {
-                AppLog.Warn("No domain controllers configured in Appsettings.json.", color: Color.DarkGoldenrod);
+                AppLog.Warn("No domain controllers could be discovered or configured.", color: Color.DarkGoldenrod);
                 return null;
             }
 
-            SecureString securePassword = new SecureString();
-            foreach (char c in _adminPassword)
-                securePassword.AppendChar(c);
-            securePassword.MakeReadOnly();
+            // Drop hosts that aren't listening for WinRM before asking PowerShell to connect --
+            // an unreachable DC costs ~700ms here instead of the remoting stack's own timeout.
+            // Probed concurrently, so the cost is one timeout rather than one per dead DC; the
+            // results are still reported in PDC-first order for predictable output.
+            var probes = candidates.Select(dc => new { Dc = dc, Open = Task.Run(() => IsWinRmPortOpen(dc)) }).ToList();
+            Task.WaitAll(probes.Select(p => p.Open).ToArray());
+
+            var reachable = new List<string>();
+            foreach (var probe in probes)
+            {
+                if (probe.Open.Result) reachable.Add(probe.Dc);
+                else AppLog.Screen($"\t{probe.Dc}: WinRM not reachable — skipped.", Color.DarkGray);
+            }
+
+            if (reachable.Count == 0)
+            {
+                AppLog.Warn("\tNone of the domain controllers are reachable over WinRM.", color: Color.IndianRed);
+                _eventLogBlocked = true;
+                PrintEventLogBlockedHelp();
+                return null;
+            }
 
             // Filter server-side on both the event id and the target account, and cap the search to
             // a recent window. Without the time bound the DC scans the whole Security log, which on
@@ -538,126 +563,227 @@ namespace ADUtils
             string xpath = $"*[System[EventID=4740 and TimeCreated[timediff(@SystemTime) <= {windowMs}]]]" +
                            $" and *[EventData[Data[@Name='TargetUserName']='{username}']]";
 
-            bool anyReachable = false;
-            foreach (string dc in candidates)
+            AppLog.Screen($"\tQuerying {reachable.Count} DC(s) over WinRM: {string.Join(", ", reachable)}", Color.DarkCyan);
+
+            // Bound the wait rather than letting the remoting stack decide how long the operator
+            // sits there. The abandoned task unwinds on its own; nothing downstream depends on it.
+            var lookup = Task.Run(() => QueryLockoutEvent(reachable, xpath));
+
+            if (!lookup.Wait(TimeSpan.FromSeconds(LockoutLookupTimeoutSeconds)))
             {
-                if (!IsRpcPortOpen(dc))
-                {
-                    AppLog.Screen($"\t{dc}: not reachable — skipped.", Color.DarkGray);
-                    continue;
-                }
-
-                anyReachable = true;
-                AppLog.Prompt($"\t{dc}: ");
-
-                string caller = null;
-                string failure = null;
-                bool rpcBlocked = false;
-                DateTime? foundAt = null;
-
-                // A blocked RPC call takes ~21 seconds to time out on its own, so bound the wait
-                // instead of letting it dictate how long the operator sits there. The abandoned
-                // thread unwinds on its own; nothing downstream depends on it.
-                var probe = Task.Run(() =>
-                {
-                    try
-                    {
-                        using var session = new EventLogSession(dc, _domain, _adminUsername, securePassword, SessionAuthentication.Default);
-                        var eventsQuery = new EventLogQuery("Security", PathType.LogName, xpath)
-                        {
-                            Session = session,
-                            ReverseDirection = true     // newest first
-                        };
-
-                        using var logReader = new EventLogReader(eventsQuery);
-                        using EventRecord evt = logReader.ReadEvent();
-
-                        if (evt == null)
-                        {
-                            failure = $"no 4740 event for this user in the last {LockoutSearchWindowDays} days.";
-                            return;
-                        }
-
-                        string found = ExtractXmlDataValue(evt.ToXml(), "CallerComputerName");
-                        if (string.IsNullOrWhiteSpace(found))
-                        {
-                            failure = "event found but it carries no CallerComputerName.";
-                            return;
-                        }
-                        // Don't write to the console from inside the task -- if the bounded wait
-                        // below has already given up, output would interleave with the next prompt.
-                        foundAt = evt.TimeCreated;
-                        caller = found.TrimStart('\\');
-                    }
-                    catch (Exception ex) when (ex.HResult == unchecked((int)0x800706BA) ||
-                                               ex.Message.Contains("RPC server is unavailable"))
-                    {
-                        // Port 135 answered but the RPC call itself failed, which means the dynamic
-                        // RPC port range that 135 redirects to is blocked. No credential works
-                        // around that, and it is a host firewall policy -- so it will be the same
-                        // on every DC. Give up on the rest rather than paying the timeout again.
-                        rpcBlocked = true;
-                    }
-                    catch (UnauthorizedAccessException)
-                    {
-                        failure = $"access denied for '{_adminUsername}' — the account needs to be in Event Log Readers on {dc}.";
-                    }
-                    catch (EventLogNotFoundException)
-                    {
-                        failure = "no Security log.";
-                    }
-                    catch (Exception ex)
-                    {
-                        failure = ex.Message;
-                    }
-                });
-
-                if (!probe.Wait(TimeSpan.FromSeconds(LockoutLookupTimeoutSeconds)))
-                {
-                    AppLog.Warn($"gave up after {LockoutLookupTimeoutSeconds}s.", color: Color.DarkGoldenrod);
-                    _eventLogBlocked = true;
-                    PrintEventLogBlockedHelp();
-                    return null;
-                }
-
-                if (caller != null)
-                {
-                    AppLog.Info($"found ({foundAt:MM-dd-yyyy HH:mm:ss}).", Color.DarkOliveGreen);
-                    return caller;
-                }
-                if (rpcBlocked)
-                {
-                    AppLog.Warn("remote Security log is blocked.", color: Color.DarkGoldenrod);
-                    _eventLogBlocked = true;
-                    PrintEventLogBlockedHelp();
-                    return null;
-                }
-                AppLog.Screen(failure, Color.DarkGray);
+                // Deliberately does NOT set _eventLogBlocked. A timeout is ambiguous -- it can mean
+                // a slow Security log scan on a busy DC just as easily as a hung transport -- and
+                // caching it would disable the feature for the rest of the session over what may
+                // have been one slow query. Real transport and authorization failures come back in
+                // well under a second, and those do get cached.
+                AppLog.Warn($"\tGave up after {LockoutLookupTimeoutSeconds}s — the DC did not answer in time. Try again.", color: Color.DarkGoldenrod);
+                return null;
             }
 
-            if (!anyReachable)
+            LockoutQueryResult result = lookup.Result;
+
+            if (result.Hit != null)
             {
-                AppLog.Warn("\tNone of the configured domain controllers are reachable.", color: Color.IndianRed);
+                AppLog.Info($"\t{result.Hit.DomainController} answered: locked out {result.Hit.TimeCreated:MM-dd-yyyy HH:mm:ss}.", Color.DarkOliveGreen);
+                return result.Hit.Caller;
             }
+
+            if (result.Failure != null)
+            {
+                // A transport or authorization failure applies to every DC equally, so remember it
+                // and stop retrying for the rest of the session. A clean "no event for this user"
+                // leaves _eventLogBlocked alone -- that is a normal negative result, and poisoning
+                // the cache with it would break every later lookup.
+                AppLog.Warn($"\t{result.Failure}", color: Color.IndianRed);
+                _eventLogBlocked = true;
+                PrintEventLogBlockedHelp();
+                return null;
+            }
+
+            AppLog.Screen($"\tNo Event 4740 for '{username}' on any DC in the last {LockoutSearchWindowDays} days.", Color.DarkGray);
             return null;
         }// end of LookupLockoutSource
 
+        /// <summary>One DC's answer for a lockout query.</summary>
+        private sealed class LockoutHit
+        {
+            public string Caller { get; init; }
+            public DateTime TimeCreated { get; init; }
+            public string DomainController { get; init; }
+        }
+
         /// <summary>
-        /// Explains the one thing that actually has to change for this lookup to work.
+        /// Outcome of a lockout query. Distinguishes the three cases the caller must treat
+        /// differently: found, genuinely nothing recorded, and could-not-ask.
+        /// </summary>
+        private sealed class LockoutQueryResult
+        {
+            public LockoutHit Hit { get; init; }
+
+            /// <summary>Set only when the query could not be performed, not when it found nothing.</summary>
+            public string Failure { get; init; }
+        }
+
+        /// <summary>
+        /// Runs the 4740 query against every DC in one Invoke-Command.
+        ///
+        /// WinRM rather than <c>EventLogSession</c>: the event-log RPC interface is blocked in this
+        /// environment (port 135 answers but the dynamic range it redirects to does not), and that
+        /// is pre-authentication so no credential helps. WinRM is reachable and the admin account
+        /// is a Domain Admin, so it is authorized to read a DC's Security log.
+        ///
+        /// PowerShell fans -ComputerName out in parallel itself, so this is one round trip for all
+        /// DCs rather than a sequential loop.
+        /// </summary>
+        private LockoutQueryResult QueryLockoutEvent(List<string> domainControllers, string xpath)
+        {
+            try
+            {
+                using Runspace runspace = RunspaceFactory.CreateRunspace();
+                runspace.Open();
+
+                using PowerShell ps = PowerShell.Create();
+                ps.Runspace = runspace;
+
+                // -ErrorAction SilentlyContinue is required, not cosmetic: Get-WinEvent raises a
+                // *terminating* error when nothing matches the filter, which must read as
+                // "not found" rather than as a failure.
+                // TimeCreated plus the raw XML lets ExtractXmlDataValue below do the parsing,
+                // keeping the remote script minimal.
+                ps.AddCommand("Invoke-Command");
+                ps.AddParameter("ComputerName", domainControllers.ToArray());
+                ps.AddParameter("Credential", BuildAdminCredential());
+                ps.AddParameter("ScriptBlock", ScriptBlock.Create(@"
+                    Get-WinEvent -LogName Security -FilterXPath $args[0] -MaxEvents 1 -ErrorAction SilentlyContinue |
+                        Select-Object TimeCreated, @{ n = 'Xml'; e = { $_.ToXml() } }"));
+                ps.AddParameter("ArgumentList", new object[] { xpath });
+
+                var results = ps.Invoke();
+
+                if (ps.Streams.Error.Count > 0)
+                {
+                    // Report the first error but keep any results: one unreachable DC in the set
+                    // shouldn't discard an answer another DC returned.
+                    string first = ps.Streams.Error[0].Exception?.Message ?? ps.Streams.Error[0].ToString();
+                    foreach (var e in ps.Streams.Error)
+                    {
+                        AppLog.Detail($"WinRM error: {e.Exception?.Message ?? e.ToString()}");
+                    }
+                    if (results == null || results.Count == 0)
+                    {
+                        return new LockoutQueryResult { Failure = first };
+                    }
+                }
+
+                if (results == null || results.Count == 0) return new LockoutQueryResult();
+
+                // More than one DC can hold an event for the same account; the newest wins.
+                LockoutHit best = null;
+                foreach (PSObject result in results)
+                {
+                    string xml = result.Properties["Xml"]?.Value as string;
+                    if (string.IsNullOrWhiteSpace(xml)) continue;
+
+                    string caller = ExtractXmlDataValue(xml, "CallerComputerName");
+                    if (string.IsNullOrWhiteSpace(caller)) continue;
+
+                    DateTime when = result.Properties["TimeCreated"]?.Value is DateTime dt ? dt : DateTime.MinValue;
+                    string dc = result.Properties["PSComputerName"]?.Value as string ?? "unknown DC";
+
+                    if (best == null || when > best.TimeCreated)
+                    {
+                        best = new LockoutHit
+                        {
+                            Caller = caller.TrimStart('\\'),
+                            TimeCreated = when,
+                            DomainController = dc
+                        };
+                    }
+                }
+                return new LockoutQueryResult { Hit = best };
+            }
+            catch (Exception ex)
+            {
+                return new LockoutQueryResult { Failure = ex.Message };
+            }
+        }// end of QueryLockoutEvent
+
+        /// <summary>
+        /// Builds the PSCredential for remoting from the credentials captured at login.
+        ///
+        /// The name has to be domain-qualified for WinRM, but must not be qualified twice if the
+        /// operator already typed DOMAIN\user or a UPN. Note the password is not sent in the clear
+        /// on port 5985 -- PowerShell remoting encrypts the payload via Kerberos/Negotiate.
+        /// </summary>
+        private PSCredential BuildAdminCredential()
+        {
+            string user = _adminUsername.Contains('\\') || _adminUsername.Contains('@') || string.IsNullOrWhiteSpace(_domain)
+                ? _adminUsername
+                : $"{_domain}\\{_adminUsername}";
+
+            SecureString securePassword = new SecureString();
+            foreach (char c in _adminPassword)
+                securePassword.AppendChar(c);
+            securePassword.MakeReadOnly();
+
+            return new PSCredential(user, securePassword);
+        }// end of BuildAdminCredential
+
+        /// <summary>
+        /// Explains what has to change for this lookup to work.
         /// </summary>
         private static void PrintEventLogBlockedHelp()
         {
-            AppLog.Warn($"\tThe DCs' remote Security log is not readable from this machine.", color: Color.IndianRed);
-            AppLog.Screen($"\tPort 135 answers but the RPC call is refused, so the dynamic RPC range is blocked.", Color.Gray);
-            AppLog.Screen($"\tFix: enable the {"Remote Event Log Management".Pastel(Color.MediumPurple)} inbound firewall rules on the DCs,", Color.Gray);
-            AppLog.Screen($"\tand ensure the admin account is in {"Event Log Readers".Pastel(Color.MediumPurple)}. Until then use ADUC / a DC session.", Color.Gray);
+            AppLog.Warn("\tCould not read the Security log from any domain controller.", color: Color.IndianRed);
+            AppLog.Screen($"\tThis lookup uses {"WinRM".Pastel(Color.MediumPurple)} (TCP 5985). Check, on the DCs:", Color.Gray);
+            AppLog.Screen($"\t  - WinRM is enabled and its firewall rule allows this subnet  ({"Test-WSMan -ComputerName <dc>".Pastel(Color.MediumPurple)})", Color.Gray);
+            AppLog.Screen("\t  - the admin account you logged in with is an administrator on the DC", Color.Gray);
+            AppLog.Screen("\tUntil then, trace lockouts from Event Viewer on the DC (Security log, Event ID 4740).", Color.Gray);
         }// end of PrintEventLogBlockedHelp
 
         /// <summary>
-        /// Configured DCs, with the PDC emulator first because it is the DC that processes lockouts
-        /// and so is the most likely to hold the 4740 record.
+        /// The DCs to query, PDC emulator first because it processes lockouts and so is the most
+        /// likely to hold the 4740 record.
+        ///
+        /// Discovered from AD rather than hardcoded: the configured list had gone stale in both
+        /// directions -- it named a decommissioned DC and omitted a live one, so lockouts recorded
+        /// by the missing DC could never be found. <c>myDomainControllers</c> is now an optional
+        /// restriction for when the search should be limited to specific DCs.
         /// </summary>
         private List<string> BuildDomainControllerSearchOrder()
+        {
+            // Explicit restriction wins when configured.
+            if (_domainControllers.Count > 0)
+            {
+                AppLog.Detail($"Using the configured domain controller list: {string.Join(", ", _domainControllers)}");
+                return OrderPdcFirst(_domainControllers);
+            }
+
+            try
+            {
+                var discovered = System.DirectoryServices.ActiveDirectory.Domain.GetComputerDomain()
+                                     .DomainControllers
+                                     .Cast<System.DirectoryServices.ActiveDirectory.DomainController>()
+                                     .Select(dc => dc.Name)
+                                     .Where(n => !string.IsNullOrWhiteSpace(n))
+                                     .ToList();
+
+                if (discovered.Count > 0)
+                {
+                    AppLog.Detail($"Discovered {discovered.Count} domain controller(s) from AD: {string.Join(", ", discovered)}");
+                    return OrderPdcFirst(discovered);
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLog.Detail($"Domain controller discovery failed, falling back to configuration: {ex.Message}");
+            }
+
+            return OrderPdcFirst(_domainControllers);
+        }// end of BuildDomainControllerSearchOrder
+
+        /// <summary>Moves the PDC emulator to the front of the list, if it can be identified.</summary>
+        private static List<string> OrderPdcFirst(List<string> domainControllers)
         {
             var ordered = new List<string>();
             try
@@ -667,37 +793,39 @@ namespace ADUtils
             }
             catch
             {
-                // Not domain-joined or the PDC can't be located; fall back to the configured list.
+                // Not domain-joined or the PDC can't be located; order doesn't matter then.
             }
 
-            foreach (string dc in _domainControllers)
+            foreach (string dc in domainControllers)
             {
-                // Match short name against the PDC's FQDN so it isn't probed twice.
+                // Compare short name against the PDC's FQDN so it isn't queried twice.
                 bool alreadyQueued = ordered.Any(existing =>
                     existing.Equals(dc, StringComparison.OrdinalIgnoreCase) ||
-                    existing.StartsWith(dc + ".", StringComparison.OrdinalIgnoreCase));
+                    existing.StartsWith(dc + ".", StringComparison.OrdinalIgnoreCase) ||
+                    dc.StartsWith(existing + ".", StringComparison.OrdinalIgnoreCase));
 
                 if (!alreadyQueued) ordered.Add(dc);
             }
             return ordered;
-        }// end of BuildDomainControllerSearchOrder
+        }// end of OrderPdcFirst
 
         /// <summary>
-        /// Short TCP probe of the RPC endpoint mapper, so an offline DC costs well under a second
-        /// instead of the ~8 second RPC timeout.
+        /// Short TCP probe of the WinRM port, so an offline DC costs well under a second instead of
+        /// the remoting stack's own connect timeout.
         /// </summary>
-        private static bool IsRpcPortOpen(string host)
+        private static bool IsWinRmPortOpen(string host)
         {
+            const int winRmPort = 5985;
             try
             {
                 using var client = new System.Net.Sockets.TcpClient();
-                return client.ConnectAsync(host, 135).Wait(TimeSpan.FromMilliseconds(700)) && client.Connected;
+                return client.ConnectAsync(host, winRmPort).Wait(TimeSpan.FromMilliseconds(700)) && client.Connected;
             }
             catch
             {
                 return false;
             }
-        }// end of IsRpcPortOpen
+        }// end of IsWinRmPortOpen
 
         /// <summary>
         /// Extracts the value of a named Data element from a Windows Event XML string.
