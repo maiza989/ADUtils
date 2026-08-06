@@ -248,10 +248,20 @@ namespace ADUtils
                             continue;
                         }
 
+                        // Resolve to a DN before doing anything. Add/Remove-ADPermission below works
+                        // on AD objects and rejects an SMTP address, while Add/Remove-MailboxPermission
+                        // accepts one -- so passing the operator's raw input to both would grant
+                        // FullAccess and silently fail Send As whenever they typed an email address.
+                        if (!exchange.TryResolveMailbox(sharedMailbox, out string mailboxDn, out string mailboxName))
+                        {
+                            continue;
+                        }
+                        AppLog.Screen($"Resolved '{sharedMailbox}' to mailbox '{mailboxName}'.", Color.DarkCyan);
+
                         // FullAccess -- lets the user open the mailbox.
                         var mailboxParams = new Dictionary<string, object>
                         {
-                            ["Identity"] = sharedMailbox,
+                            ["Identity"] = mailboxDn,
                             ["User"] = username,
                             ["AccessRights"] = "FullAccess"
                         };
@@ -276,7 +286,7 @@ namespace ADUtils
                         // Send As -- on-prem uses an AD extended right, not Add-RecipientPermission.
                         var sendAsParams = new Dictionary<string, object>
                         {
-                            ["Identity"] = sharedMailbox,
+                            ["Identity"] = mailboxDn,
                             ["User"] = username,
                             ["ExtendedRights"] = "Send As",
                             ["Confirm"] = false
