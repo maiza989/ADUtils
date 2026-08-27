@@ -1,0 +1,7 @@
+<ItemGroup>
+  <Reference Include="Interop.ActiveDs">
+    <HintPath>libs\Interop.ActiveDs.dll</HintPath>
+    <Private>true</Private>
+    <EmbedInteropTypes>false</EmbedInteropTypes>
+  </Reference>
+</ItemGroup>

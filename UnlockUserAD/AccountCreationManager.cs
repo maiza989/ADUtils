@@ -23,39 +23,40 @@ namespace ADUtils
         EmailNotifcationManager emailNotification = new EmailNotifcationManager(Program.configuration);
         AuditLogManager auditLogManager;
 
+        private readonly IConfiguration _configuration;
+
         public readonly string _myDomain;
         public readonly string _myDomainDotCom;
-        private string _myParentOU;
-        public string _myCompany;
-        private readonly string _myExchangeDatabase;
-        private readonly string _myExchangeServer;
 
+        /// <summary>Working parent OU — reassigned per selection while creating an account.</summary>
+        private string _myParentOU;
+
+        /// <summary>The configured parent OU, never reassigned. Use this for OU paths.</summary>
+        public readonly string _myConfiguredParentOU;
+
+        public string _myCompany;
+        public readonly string _myExEmployeeOU;
+        public readonly int _myDeletionGraceDays;
 
 
         public AccountCreationManager(AuditLogManager auditLogManager, IConfiguration configuration)
+            : this(configuration)
         {
             this.auditLogManager = auditLogManager;
-
-            _myDomain = configuration["AccountCreationSettings:myDomain"];                                                      // Update with your domain
-            _myDomainDotCom = configuration["AccountCreationSettings:myDomainDotCom"];                                          // Update with your second part of your domain (domain(.com))
-            _myParentOU = configuration["AccountCreationSettings:myParentOU"];                                                  // Update with your path of Users OU
-            _myCompany = configuration["AccountCreationSettings:myCompany"];                                                    // Update with your company email domain (*@companyName.com)
-            _myExchangeDatabase = configuration["AccountCreationSettings:myExchangeDatabase"];                                  // Update with your Exchange server database
-            _myExchangeServer = configuration["AccountCreationSettings:myExchangeServer"];                                      // Update with your exchange server name.
-
-        }// end of constructor 
+        }// end of constructor
 
         public AccountCreationManager(IConfiguration configuration)
         {
+            _configuration = configuration;
+
             _myDomain = configuration["AccountCreationSettings:myDomain"];                                                      // Update with your domain
             _myDomainDotCom = configuration["AccountCreationSettings:myDomainDotCom"];                                          // Update with your second part of your domain (domain(.com))
             _myParentOU = configuration["AccountCreationSettings:myParentOU"];                                                  // Update with your path of Users OU
+            _myConfiguredParentOU = _myParentOU;
             _myCompany = configuration["AccountCreationSettings:myCompany"];                                                    // Update with your company email domain (*@companyName.com)
-            _myExchangeDatabase = configuration["AccountCreationSettings:myExchangeDatabase"];                                  // Update with your Exchange server database
-            _myExchangeServer = configuration["AccountCreationSettings:myExchangeServer"];                                      // Update with your exchange server name.
+            _myExEmployeeOU = configuration["AccountCreationSettings:myExEmployeeOU"] ?? "Ex Employee";                         // OU that deactivated accounts are moved into
+            _myDeletionGraceDays = int.TryParse(configuration["AccountCreationSettings:myDeletionGraceDays"], out int days) ? days : 31;
         }
-
-        public AccountCreationManager() { }
         public int processSleepTimer = 1000;
 
         private string firstName;
@@ -67,7 +68,7 @@ namespace ADUtils
         private string manager;
         private string managerDN;
         private string targetOU;
-        private string targetOUSelection;
+       // private string targetOUSelection;      
         private string firstInitial;
         private string lastInitial;
         private string username;
@@ -283,11 +284,11 @@ namespace ADUtils
                         if (confirmation == "Y")
                         {
                             isExit = true;
-                            Console.WriteLine("User information has been verified. \nCreating user...\n");
+                            Console.WriteLine("User information has been verified. \nCreating user...\n".Pastel(Color.DarkCyan));
                         }// end of if-statement
                         else
                         {
-                            Console.WriteLine("\nReturning to menu....");
+                            Console.WriteLine("\nReturning to menu....".Pastel(Color.Gray));
                             return;
                         }// end of else-statement
                     }// end of while
@@ -411,153 +412,227 @@ namespace ADUtils
                 }// end of CreateUserAccount*/
 
 
+        /// <summary>
+        /// Prompts until a non-empty name is entered, or returns null if the operator types 'exit'.
+        /// Empty names previously produced an empty sAMAccountName and a confusing Save() failure.
+        /// </summary>
+        private string PromptForRequiredName(string prompt, string fieldLabel)
+        {
+            while (true)
+            {
+                AppLog.Prompt(prompt);
+                string value = ConsoleInput.ReadTrimmed();
+
+                if (value.Equals("exit", StringComparison.OrdinalIgnoreCase))
+                {
+                    AppLog.Screen("\nReturning to menu....", Color.Gray);
+                    return null;
+                }
+                if (value.Length == 0)
+                {
+                    AppLog.Warn($"{fieldLabel} is required (or type {"'exit'".Pastel(Color.MediumPurple)} to return to the menu).", color: Color.IndianRed);
+                    continue;
+                }
+                // These land in the CN and the DN. Reject the RFC 4514 special characters rather
+                // than emitting a malformed DN that fails with an opaque COM error.
+                int bad = value.IndexOfAny(new[] { ',', '+', '"', '\\', '<', '>', ';', '=', '#', '/' });
+                if (bad >= 0)
+                {
+                    AppLog.Warn($"{fieldLabel} cannot contain '{value[bad]}' — it is reserved in Active Directory names.", color: Color.IndianRed);
+                    continue;
+                }
+                return value;
+            }
+        }// end of PromptForRequiredName
+
+        /// <summary>
+        /// Builds a random temporary password.
+        ///
+        /// This replaced a derived pattern ("New_User_{company}_{INITIALS}!") that anyone who knew
+        /// the convention could guess from the new hire's name. Guaranteed to satisfy the same
+        /// rules <see cref="PasswordManager.IsPasswordVaild"/> enforces: length, upper, lower,
+        /// digit and symbol.
+        /// </summary>
+        private static string GenerateTempPassword()
+        {
+            const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";       // no I/O — avoids read-back confusion
+            const string lower = "abcdefghijkmnopqrstuvwxyz";      // no l
+            const string digits = "23456789";                      // no 0/1
+            const string symbols = "!@#$%^&*?-_";
+            const string all = upper + lower + digits + symbols;
+            int length = PasswordManager.MinimumPasswordLength + 1;  // one over the enforced minimum
+
+            var chars = new List<char>(length)
+            {
+                // One from each class up front so the result always satisfies the policy.
+                PickRandom(upper),
+                PickRandom(lower),
+                PickRandom(digits),
+                PickRandom(symbols)
+            };
+            while (chars.Count < length)
+            {
+                chars.Add(PickRandom(all));
+            }
+
+            // Fisher-Yates with a cryptographic RNG, so the per-class characters aren't
+            // always in positions 0-3.
+            for (int i = chars.Count - 1; i > 0; i--)
+            {
+                int j = System.Security.Cryptography.RandomNumberGenerator.GetInt32(i + 1);
+                (chars[i], chars[j]) = (chars[j], chars[i]);
+            }
+            return new string(chars.ToArray());
+        }// end of GenerateTempPassword
+
+        private static char PickRandom(string set)
+        {
+            return set[System.Security.Cryptography.RandomNumberGenerator.GetInt32(set.Length)];
+        }// end of PickRandom
+
         public void CreateUserAccount(string adminUsername, string adminPassword)
         {
             bool manualSteps = false;
 
+            emailActionLog.Clear(); // Add at top of CreateUserAccount
             // -------------------------
             // Prompt for user details
             // -------------------------
-            Console.Write("Enter new user's first name: ");
-            firstName = Console.ReadLine();
+            firstName = PromptForRequiredName("Enter new user's first name: ", "First name");
+            if (firstName == null) return;
 
-            Console.Write("Enter new user's last name: ");
-            lastName = Console.ReadLine();
+            lastName = PromptForRequiredName("Enter new user's last name: ", "Last name");
+            if (lastName == null) return;
 
-            Console.Write("Enter user's job title: ");
-            jobTitle = Console.ReadLine();
+            AppLog.Prompt("Enter user's job title: ");
+            jobTitle = ConsoleInput.ReadTrimmed();
 
-            Console.Write("Enter user's department: ");
-            departmentEntry = Console.ReadLine();
+            AppLog.Prompt("Enter user's department: ");
+            departmentEntry = ConsoleInput.ReadTrimmed();
 
-            Console.Write("Enter user description: ");
-            description = Console.ReadLine();
+            AppLog.Prompt("Enter user description: ");
+            description = ConsoleInput.ReadTrimmed();
 
-            Console.Write("Enter user office (KY, MI, GA, or Remote): ");
-            office = Console.ReadLine().Trim().ToUpper();
+            AppLog.Prompt("Enter user office (KY, MI, GA, or Remote): ");
+            office = ConsoleInput.ReadTrimmedUpper();
 
-            Console.Write("Enter user manager (SAM Account Name): ");
-            manager = Console.ReadLine();
+            AppLog.Prompt("Enter user manager (SAM Account Name): ");
+            manager = ConsoleInput.ReadTrimmed();
 
             // -------------------------
             // Define OU options dynamically
             // -------------------------
-            var TargetOUs = new List<TargetOU>
-    {
-                //TODO - fix empty target OU for MI and GA users.
-                //TODO - Test MI and GA user creation with group membership assignment.
-        // KY
-        new TargetOU("KY", "IT", "LloydMc_Lou"),
-        new TargetOU("KY", "Collector", "LloydMc_Lou"),
-        new TargetOU("KY", "Admin Staff", "LloydMc_Lou"),
-        new TargetOU("KY", "Atty", "LloydMc_Lou"),
-        new TargetOU("KY", "Acct", "LloydMc_Lou"),
-        new TargetOU("KY", "Compliance", "LloydMc_Lou"),
-
-        // MI
-        new TargetOU("MI", "General", "Michigan_Users", "Michigan Users"),
-        new TargetOU("MI", "Collector", "Michigan_Users", "Michigan Collector"),
-        new TargetOU("MI", "Admin Staff", "Michigan_Users", "Michigan Admin Staff"),
-        new TargetOU("MI", "Atty", "Michigan_Users", "Michigan Atty"),
-        new TargetOU("MI", "Acct", "Michigan_Users", "Michigan Accounting"),
-
-        // GA
-        new TargetOU("GA", "", "Cooling_Users", "Default Georgia Users"),
-        new TargetOU("GA", "Call_Center", "Cooling_Users", "Georgia Collector"),
-        new TargetOU("GA", "GA_Staff", "Cooling_Users", "Georgia Admin Staff"),
-        new TargetOU("GA", "Atty", "Cooling_Users", "Georgia Atty"),
-        new TargetOU("GA", "Accounting", "Cooling_Users", "Georgia Accounting"),
-
-        // Remote
-        new TargetOU("REMOTE", "IT", "LloydMc_Lou"),
-        new TargetOU("REMOTE", "Collector", "LloydMc_Lou"),
-        new TargetOU("REMOTE", "Admin Staff", "LloydMc_Lou"),
-        new TargetOU("REMOTE", "Atty", "LloydMc_Lou"),
-        new TargetOU("REMOTE", "Acct", "LloydMc_Lou"),
-        new TargetOU("REMOTE", "Compliance", "LloydMc_Lou"),
-        new TargetOU("REMOTE", "", "Michigan_Users", "Michigan Users"),
-        new TargetOU("REMOTE", "", "Cooling_Users", "GA Users")
-    };
+            // Shared with the "Validate Group Assignment" report, so the rows the operator picks
+            // from are exactly the rows that get checked against AD.
+            var TargetOUs = GroupAssignmentHelper.GetTargetOUs();
 
             // Filter options by office
             var filteredOptions = TargetOUs.Where(o => o.Office == office).ToList();
             if (!filteredOptions.Any())
             {
-                Console.WriteLine("Invalid office entered. Defaulting to KY IT.");
-                filteredOptions = TargetOUs.Where(o => o.Office == "KY").Take(1).ToList();
+                AppLog.Warn($"'{office}' is not a recognized office. Valid values: " +
+                            $"{string.Join(", ", TargetOUs.Select(o => o.Office).Distinct())}.", color: Color.IndianRed);
+                AppLog.Screen("Returning to menu — no account was created.", Color.Gray);
+                return;
             }
 
             // -------------------------
             // Display options and get selection
             // -------------------------
-            Console.WriteLine($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}:");
+            AppLog.Screen($"Select New User OU. {"Enter Number".Pastel(Color.MediumPurple)}:");
             for (int i = 0; i < filteredOptions.Count; i++)
-                Console.WriteLine($"{i + 1}- {filteredOptions[i].DisplayName}");
+                AppLog.Screen($"{i + 1}- {filteredOptions[i].DisplayName}");
 
             int choice;
             bool validInput;
             do
             {
-                Console.Write("Enter your choice: ");
-                validInput = int.TryParse(Console.ReadLine().Trim(), out choice) && choice >= 1 && choice <= filteredOptions.Count;
+                AppLog.Prompt("Enter your choice: ");
+                validInput = int.TryParse(ConsoleInput.ReadTrimmed(), out choice) && choice >= 1 && choice <= filteredOptions.Count;
                 if (!validInput)
-                    Console.WriteLine($"Invalid input, please enter a number between 1 and {filteredOptions.Count}.");
+                    AppLog.Warn($"Invalid input, please enter a number between 1 and {filteredOptions.Count}.", color: Color.IndianRed);
             } while (!validInput);
 
             var selectedOU = filteredOptions[choice - 1];
-            targetOU = selectedOU.Role;
+            // SubOu, not Role: the AD OU is often named differently from the role label
+            // ("Atty" -> OU=Attorneys, "GA_Staff" -> OU=Staff), and empty means "sit in the parent".
+            targetOU = selectedOU.SubOu;
             _myParentOU = selectedOU.ParentOU;
-            string region = selectedOU.Office; // for AddNewUserToGroups
-            string role = selectedOU.Role;      // for AddNewUserToGroups
+            string region = selectedOU.Region;   // not Office — see TargetOU.Region
+            string role = selectedOU.Role; // keep "General" for group lookup
+
+            // Fail before creating anything if this region/role has no group mapping, rather
+            // than creating an account that silently lands with no group membership.
+            var plannedGroups = GroupAssignmentHelper.GetGroups(region, role);
+            if (plannedGroups.Count == 0)
+            {
+                AppLog.Warn($"No group assignment is defined for Region='{region}', Role='{role}'.", color: Color.IndianRed);
+                AppLog.Screen("Add it to GroupAssignmentHelper before creating this account. Nothing was created.", Color.Gray);
+                return;
+            }
 
             // -------------------------
             // Generate username, email, etc.
             // -------------------------
-            firstInitial = Regex.Match(firstName, ".{1,1}").Value;
-            lastInitial = Regex.Match(lastName, ".{1,1}").Value;
+            firstInitial = firstName.Substring(0, 1);
+            lastInitial = lastName.Substring(0, 1);
             username = $"{firstInitial.ToLower()}{lastName.ToLower()}";
             email = $"{username}@{_myCompany}.com";
-            password = $"New_User_{_myCompany}_{firstInitial.ToUpper()}{lastInitial.ToUpper()}!";
-            userProfile = $@"\\lmnas-02\users\{username}";
+            password = $"New_User_lloydmc_{firstInitial}{lastInitial}!";
+            userProfile = $@"\\lmusrdata\User_Profiles\{username}";
             clsUserFolder = $@"\\lmcls\sys\users\{firstInitial.ToLower()}{lastName.ToLower()}";
+
+            // sAMAccountName is limited to 20 characters in AD; Save() would fail with an
+            // unhelpful COM error otherwise.
+            if (username.Length > 20)
+            {
+                AppLog.Error($"Generated username '{username}' is {username.Length} characters; " +
+                             "AD allows a maximum of 20. Shorten the last name or create this account manually.");
+                return;
+            }
 
             // -------------------------
             // Display summary
             // -------------------------
-            Console.WriteLine($"\n-----------------------------------------------------------------------------------" +
-                              $"\n{"First Name:",-20} {firstName}\n" +
-                              $"{"Last Name:",-20} {lastName}\n" +
-                              $"{"Display Name:",-20} {firstName} {lastName}\n" +
-                              $"{"Username:",-20} {username}\n" +
-                              $"{"Email Address:",-20} {email}\n" +
-                              $"{"Temp Password:",-20} {password} \n" +
-                              $"{"Department:",-20} {departmentEntry} \n" +
-                              $"{"Title:",-20} {jobTitle} \n" +
-                              $"{"Description:",-20} {description} \n" +
-                              $"{"Physical Office:",-20} {office} \n" +
-                              $"{"User Assigned OU:",-20} {targetOU} \n" +
-                              $"{"User Parent OU",-20} {_myParentOU} \n" +
-                              $"{"Script Path:",-20} logon.bat \n" +
-                              $"{"Home Drive:",-20} P: \n" +
-                              $"{"User Home Directory:",-20} {userProfile} \n" +
-                              $"{"CLS Folder Location:",-20} {clsUserFolder}\n" +
-                              $"-----------------------------------------------------------------------------------\n");
+            // Split deliberately: the temp password goes to the screen ONLY. Everything else is
+            // logged. Do not merge these back into one call -- it would write the generated
+            // password into the log files.
+            AppLog.Screen($"\n-----------------------------------------------------------------------------------" +
+                          $"\n{"First Name:",-20} {firstName}\n" +
+                          $"{"Last Name:",-20} {lastName}\n" +
+                          $"{"Display Name:",-20} {firstName} {lastName}\n" +
+                          $"{"Username:",-20} {username}\n" +
+                          $"{"Email Address:",-20} {email}");
+
+            AppLog.ScreenOnly($"{"Temp Password:",-20} {password}");                                 // never logged
+
+            AppLog.Screen($"{"Department:",-20} {departmentEntry} \n" +
+                          $"{"Title:",-20} {jobTitle} \n" +
+                          $"{"Description:",-20} {description} \n" +
+                          $"{"Physical Office:",-20} {office} \n" +
+                          $"{"User Assigned OU:",-20} {targetOU} \n" +
+                          $"{"User Parent OU",-20} {_myParentOU} \n" +
+                          $"{"Script Path:",-20} logon.bat \n" +
+                          $"{"Home Drive:",-20} P: \n" +
+                          $"{"User Home Directory:",-20} {userProfile} \n" +
+                          $"{"CLS Folder Location:",-20} {clsUserFolder}\n" +
+                          $"-----------------------------------------------------------------------------------\n");
 
             // -------------------------
             // Confirm info
             // -------------------------
             while (true)
             {
-                Console.Write($"\nPlease verify all new user information are correct !!!{"(Y/N)".Pastel(Color.MediumPurple)}: ");
-                string confirmation = Console.ReadLine().ToUpper().Trim();
+                AppLog.Prompt($"\nPlease verify all new user information are correct !!!{"(Y/N)".Pastel(Color.MediumPurple)}: ");
+                string confirmation = ConsoleInput.ReadTrimmedUpper();
                 if (confirmation == "Y")
                 {
-                    Console.WriteLine("User information has been verified. \nCreating user...\n");
+                    AppLog.Info("User information has been verified. \nCreating user...\n", Color.DarkCyan);
                     break;
                 }
                 else
                 {
-                    Console.WriteLine("\nReturning to menu....");
+                    AppLog.Screen("\nReturning to menu....", Color.Gray);
                     return;
                 }
             }
@@ -565,11 +640,15 @@ namespace ADUtils
             // -------------------------
             // Create user in AD
             // -------------------------
+            bool accountCreated = false;
+            bool movedToTargetOU = false;
+            bool managerSet = false;
+            bool mailboxCreated = false;
             try
             {
-                ouPath = string.IsNullOrEmpty(targetOU)
-                    ? $"LDAP://OU={_myParentOU},DC={_myDomain},DC={_myDomainDotCom}"
-                    : $"LDAP://OU={targetOU},OU={_myParentOU},DC={_myDomain},DC={_myDomainDotCom}";
+                // Built by the same helper the validation report uses, so a clean report means the
+                // creator really does target the OU that was checked.
+                ouPath = $"LDAP://{GroupAssignmentHelper.BuildRelativeOuPath(selectedOU)},DC={_myDomain},DC={_myDomainDotCom}";
 
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
                 {
@@ -592,56 +671,101 @@ namespace ADUtils
                         user.PasswordNeverExpires = false;
                         user.Save();
 
-                        using (DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject())
+                        // The temp password is handed over verbally, so require a change at first
+                        // logon rather than leaving it valid for the full domain max password age.
+                        try
                         {
-                            DirectoryEntry endOU = new DirectoryEntry(ouPath, adminUsername, adminPassword);
+                            user.ExpirePasswordNow();
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLog.Warn($"Could not flag the password for change at next logon: {ex.Message}", ex, Color.DarkGoldenrod);
+                            AppLog.Warn("Set 'User must change password at next logon' manually in ADUC.", color: Color.DarkGoldenrod);
+                        }
+
+                        // GetUnderlyingObject() returns an object owned by the UserPrincipal --
+                        // don't dispose it here, or user.Dispose() operates on a disposed entry.
+                        DirectoryEntry userEntry = (DirectoryEntry)user.GetUnderlyingObject();
+                        using (DirectoryEntry endOU = new DirectoryEntry(ouPath, adminUsername, adminPassword))
+                        {
                             userEntry.Properties["title"].Value = jobTitle;
                             userEntry.Properties["department"].Value = departmentEntry;
                             userEntry.Properties["physicalDeliveryOfficeName"].Value = office;
 
-                            try { CheckManagerDN(); userEntry.Properties["manager"].Value = managerDN; }
-                            catch (Exception ex) { Console.WriteLine($"Manager error: {ex.Message}"); }
+                            try
+                            {
+                                CheckManagerDN();
+                                userEntry.Properties["manager"].Value = managerDN;
+                                managerSet = true;
+                            }
+                            catch (Exception ex)
+                            {
+                                AppLog.Warn($"Manager could not be set to '{manager}': {ex.Message}", ex, Color.DarkGoldenrod);
+                            }
 
                             userEntry.CommitChanges();
 
-                            try { new DirectoryEntry(userEntry.Path).MoveTo(endOU); }
-                            catch (COMException ex) { Console.WriteLine($"Move error: {ex.Message}"); }
+                            try
+                            {
+                                using (var startOU = new DirectoryEntry(userEntry.Path))
+                                {
+                                    startOU.MoveTo(endOU);
+                                }
+                                movedToTargetOU = true;
+                            }
+                            catch (COMException ex)
+                            {
+                                AppLog.Error($"Move to '{ouPath}' FAILED: {ex.Message}", ex, Color.Crimson);
+                                AppLog.Warn($"'{username}' exists but is still in the default Users container — move it manually.", color: Color.Crimson);
+                            }
                         }
 
-
-                        Console.WriteLine($"User Account '{username}' Created Successfully!!!".Pastel(Color.DarkOliveGreen));
-
-                        user.Dispose();
-
-
+                        AppLog.Info($"User Account '{username}' Created Successfully!!!", Color.DarkOliveGreen);
                     }// end of UserPrincipal using
                 }// end of PrincipalContect using
 
                 IsUserCreated(username);                                                                                                        // Verify account is created in AD
                 AddNewUserToGroups(username, region, role, adminUsername, adminPassword);                                                           // Add using to basic groups based on select organizational unit (OU)
-                CreateExchangeMailbox(adminUsername, adminPassword);                                                                            // Create local Exchange mailbox
+                mailboxCreated = CreateExchangeMailbox(adminUsername, adminPassword);                                                           // Create local Exchange mailbox
                 CreateCLSFolder(clsUserFolder);                                                                                                 // Optional: Create CLS folder for new user
                 LaunchVLMMgr();                                                                                                                 // Optional: Open VLM to add CLS license to the user
                 LaunchPhoneSystemSite();                                                                                                        // Optional: Open RingCentral site to add EXT
                 LaunchO365Site();                                                                                                               // Optional: Open O365 site to add licensees to the user.
 
-                string logEntry = ($"New Account has been created \"{firstName} {lastName} | {username}\" in Active Directory\n " +
-                                   $"\nUser added to {targetOU} OU and assgined basic groups \n" +
-                                   $"\nNew Exchange MailBox has been created for \"{firstName} {lastName} | {username}\"\n" +
-                                   $"\nNew CLS folder has been created for \"{firstName} {lastName} | {username}\"\n " +
-                                   $"\nNew CLS license needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
-                                   $"\nNew vMedia license needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
-                                   $"\nNew EXT needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
-                                   $"\nNew O365 license needs to be added manually for \"{firstName} {lastName} | {username}\"\n" +
-                                   $"");
+                // Report only what actually happened. Previously this claimed the OU move and the
+                // mailbox succeeded even when both had failed and been swallowed above.
+                string who = $"\"{firstName} {lastName} | {username}\"";
+                var log = new List<string>
+                {
+                    $"New Account has been created {who} in Active Directory",
+                    movedToTargetOU
+                        ? $"User moved to {(string.IsNullOrEmpty(targetOU) ? _myParentOU : targetOU)} OU and assigned basic groups"
+                        : $"*** MOVE FAILED *** {who} is still in the default Users container and must be moved manually. Basic groups were assigned.",
+                    mailboxCreated
+                        ? $"New Exchange MailBox has been created for {who}"
+                        : $"*** MAILBOX NOT CREATED *** Exchange mailbox for {who} must be created manually.",
+                    $"New CLS folder has been created for {who}",
+                    $"New CLS license needs to be added manually for {who}",
+                    $"New vMedia license needs to be added manually for {who}",
+                    $"New EXT needs to be added manually for {who}",
+                    $"New O365 license needs to be added manually for {who}"
+                };
+                if (!managerSet)
+                {
+                    log.Add($"*** MANAGER NOT SET *** manager '{manager}' could not be applied to {who}.");
+                }
+
+                string logEntry = string.Join("\n\n", log) + "\n";
                 auditLogManager.Log(logEntry);
                 emailActionLog.Add(logEntry);
-                // TODO - Fix duplicate email log entries when creating multiple users in a row.    
+                accountCreated = true; // ← mark creation as successful
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"Error creating user account: {ex.Message}");
+                AppLog.Error($"Error creating user account: {ex.Message}", ex, Color.IndianRed);
             }// end of catch
+
+            if (!accountCreated) return; // only exits if creation actually failed
 
             if (emailActionLog.Count > 0)
             {
@@ -650,16 +774,16 @@ namespace ADUtils
             }// end of if statement
             do
             {
-                Console.Write($"Have you completed the manual steps for CLS, BRP, Phone, Office 365?{"(Y/N)".Pastel(Color.MediumPurple)}\nEnter your choice: ");
-                string result = Console.ReadLine().Trim().ToUpper();
+                AppLog.Prompt($"Have you completed the manual steps for CLS, BRP, Phone, Office 365?{"(Y/N)".Pastel(Color.MediumPurple)}\nEnter your choice: ");
+                string result = ConsoleInput.ReadTrimmedUpper();
                 if (result == "Y")
                 {
-                    Console.WriteLine("Manual Steps complete");
+                    AppLog.Info("Manual Steps complete", Color.DarkOliveGreen);
                     manualSteps = true;
                 }
                 else if (result == "N")
                 {
-                    Console.WriteLine("Manual Steps are reqired!!");
+                    AppLog.Warn("Manual Steps are reqired!!", color: Color.DarkGoldenrod);
                 }
             } while (!manualSteps);
 
@@ -675,20 +799,20 @@ namespace ADUtils
             Thread.Sleep(processSleepTimer);
             try
             {
-                using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
+                using (PrincipalContext context = AdminSession.CreateContext())
                 {
                     UserPrincipal user = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
-
-                    Console.ForegroundColor = ConsoleColor.DarkCyan;
-                    Console.WriteLine($"User Account Has Been Verfied: {user.DisplayName}!!!");
-                    Console.ForegroundColor = ConsoleColor.Gray;
-
-                    return user != null;
+                    if(user != null)
+                    {
+                        AppLog.Info($"User Account Has Been Verified: {user.DisplayName}!!!", Color.DarkCyan);
+                        return true;
+                    }
+                    return false;
                 }// end of using PrincipalContext 
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"Error checking user account existence: {ex.Message}");
+                AppLog.Error($"Error checking user account existence: {ex.Message}", ex, Color.IndianRed);
                 return false;
             }// end of catach
         }// end of IsUserCreated
@@ -853,20 +977,20 @@ namespace ADUtils
                             }// end of if statement
                             else
                             {
-                                Console.WriteLine($"Group '{groupName}' not found in Active Directory.");
+                                AppLog.Warn($"Group '{groupName}' not found in Active Directory.", color: Color.DarkGoldenrod);
                             }
                         }// end of foreach
-                        Console.WriteLine($"User '{username}' added to groups: {string.Join(", ", groups)}!!!".Pastel(Color.DarkOliveGreen));
+                        AppLog.Info($"User '{username}' added to groups: {string.Join(", ", groups)}!!!", Color.DarkOliveGreen);
                     }// end of if-statement
                     else
                     {
-                        Console.WriteLine($"User '{username}' not found for group assignment.");
+                        AppLog.Warn($"User '{username}' not found for group assignment.", color: Color.IndianRed);
                     }// end of else-statement
                 }// end of using PrincipalContext
             }// end of if-statement
             else
             {
-                Console.WriteLine($"No group assignments found for the Region='{region}', Role='{role}'");
+                AppLog.Warn($"No group assignments found for the Region='{region}', Role='{role}'", color: Color.IndianRed);
             }// end of else-statement
         }// end of addUserToGroup
 
@@ -884,131 +1008,64 @@ namespace ADUtils
                 try
                 {
                     Directory.CreateDirectory(directoryPath);
-                    Console.WriteLine($"CLS folder has been created in: {directoryPath}".Pastel(Color.DarkOliveGreen));
+                    AppLog.Info($"CLS folder has been created in: {directoryPath}", Color.DarkOliveGreen);
                 }// end of try
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"An error has occured whie creating CLS folder: {ex.Message}");
+                    AppLog.Error($"An error has occured whie creating CLS folder: {ex.Message}", ex);
                 }// end of catch
             }// end of if-statement
             else
             {
-                Console.WriteLine($"CLS file already Exist for this user: {username}".Pastel(Color.DarkGoldenrod));
+                AppLog.Warn($"CLS file already Exist for this user: {username}", color: Color.DarkGoldenrod);
             }// end of else-statement
         }// end of CreateCLSFolder
 
         /// <summary>
         /// Open BRP manager to create a BRP account for the new user manually.
         /// </summary>
-        // TODO - DONE create mailbox
-        /// <summary>
-        /// A method that convert a string to a secure string.
-        /// </summary>
-        /// <param name="str"></param>
-        /// <returns></returns>
-        private SecureString StringToSecureString(string str)
-        {
-            SecureString secureString = new SecureString();
-            foreach (char c in str.ToCharArray())
-            {
-                secureString.AppendChar(c);
-            }// end of foreach
-            secureString.MakeReadOnly();
-            return secureString;
-        }// End of StringToSecureString
 
         /// <summary>
-        /// A method that prints our error from running powershell commands if any.
+        /// Enables an on-prem Exchange mailbox for the newly created user.
         /// </summary>
-        /// <param name="ps"></param>
-        /// <param name="action"></param>
-        /// <returns></returns>
-        private bool HandlePowershellErrors(PowerShell ps, string action)
+        /// <returns>
+        /// True only when Enable-Mailbox completed without errors. Previously this always printed
+        /// "created successfully" even when the cmdlet had failed, and the audit log and
+        /// notification email inherited that false claim.
+        /// </returns>
+        private bool CreateExchangeMailbox(string adminUsername, string adminPassword)
         {
-            if (ps.Streams.Error.Count > 0)
-            {
-                foreach (ErrorRecord error in ps.Streams.Error)
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkRed;
-                    Console.WriteLine($"Error {action}: {error.Exception.Message}".Pastel(Color.IndianRed));
-                    Console.ForegroundColor = ConsoleColor.Gray;
-                }// end of foreach
-                return true;
-            }// end of if-statement
-            return false;
-        }// end of HandlePowershellErrors
-
-        /// <summary>
-        /// A method that runs mutliple powershell commands to create a mailbox the Exchange server.
-        /// </summary>
-        /// <param name="adminUsername"></param>
-        /// <param name="adminPassword"></param>
-        private void CreateExchangeMailbox(string adminUsername, string adminPassword)
-        {
-            Console.WriteLine("Creating User Mailbox...");
+            AppLog.Info("Creating User Mailbox...", Color.DarkCyan);
             Thread.Sleep(processSleepTimer);
-            SecureString securePassword = StringToSecureString(adminPassword);
 
-            Runspace runspace = RunspaceFactory.CreateRunspace();
-            runspace.Open();
-
-            using (PowerShell ps = PowerShell.Create())
+            using (var exchange = new ExchangeSessionManager(_configuration))
             {
-                ps.Runspace = runspace;
+                if (!exchange.Connect())
+                {
+                    AppLog.Warn($"Mailbox for '{username}' was NOT created — create it manually in Exchange.", color: Color.Crimson);
+                    return false;
+                }
 
-                // Set Execution Policy
-                ps.AddCommand("Set-ExecutionPolicy");
-                ps.AddParameter("ExecutionPolicy", "RemoteSigned");
+                var parameters = new Dictionary<string, object>
+                {
+                    ["Identity"] = username,
+                    ["Database"] = exchange.ExchangeDatabase
+                };
+                // Pin to a known DC. Letting Exchange choose is what produced the
+                // "no available global catalog" failure.
+                if (exchange.DomainController != null)
+                {
+                    parameters["DomainController"] = exchange.DomainController;
+                }
 
-                ps.Invoke();
-                if (HandlePowershellErrors(ps, "setting execution policy")) return;
+                if (!exchange.RunCommand("Enable-Mailbox", $"enabling mailbox for '{username}'", parameters))
+                {
+                    AppLog.Warn($"Mailbox for '{username}' was NOT created — create it manually in Exchange.", color: Color.Crimson);
+                    return false;
+                }
 
-                // Construct the New-PSSession command
-                ps.Commands.Clear();
-                ps.AddCommand("New-PSSession");
-                ps.AddParameter("ConfigurationName", "Microsoft.Exchange");
-                ps.AddParameter("ConnectionUri", new Uri($"http://{_myExchangeServer}/PowerShell/"));
-                ps.AddParameter("Authentication", "Default");                                                   // use current context session to authenticate. 
-
-                /* ps.AddParameter("Authentication", "Kerberos");
-                 ps.AddParameter("Credential", new PSCredential(adminUsername, securePassword));*/
-
-
-
-                // Invoke New-PSSession to establish a session
-                Collection<PSObject> result = ps.Invoke();
-                if (HandlePowershellErrors(ps, "creating PSSession")) return;
-
-                // Extract session
-                var sessionId = result[0];
-
-                // Import the session using Import-PSSession
-                ps.Commands.Clear();
-                ps.AddCommand("Import-PSSession");
-                ps.AddParameter("Session", sessionId);
-                ps.AddParameter("DisableNameChecking");
-
-                ps.Invoke();
-                if (HandlePowershellErrors(ps, "importing PSSession")) return;
-
-                // Enable mailbox using Enable-Mailbox
-                ps.Commands.Clear();
-                ps.AddCommand("Enable-Mailbox");
-                ps.AddParameter("Identity", username);
-                ps.AddParameter("Database", _myExchangeDatabase);
-                // TODO - Fix error about there is no avaliable globle catalog when enabling mailbox. 
-
-
-                // Invoke Enable-Mailbox
-                ps.Invoke();
-                if (HandlePowershellErrors(ps, $"enabling mailbox for '{username}'")) return;
-
-                Console.ForegroundColor = ConsoleColor.DarkCyan;
-                Console.WriteLine($"Mailbox for '{username}' created successfully!!".Pastel(Color.DarkOliveGreen));
-                Console.ForegroundColor = ConsoleColor.Gray;
-
-                runspace.Close();
-                runspace.Dispose();
+                AppLog.Info($"Mailbox for '{username}' created successfully!!", Color.DarkOliveGreen);
+                return true;
             }// end of using
         }// end of CreateExhangeMailbox
         /// <summary>
@@ -1016,7 +1073,7 @@ namespace ADUtils
         /// </summary>
         private void LaunchBRPMgr()
         {
-            Console.WriteLine($"Please create account in BRPMgr for the new user MANUALLY!!!\nOpening BRP manager...");
+            AppLog.Screen($"Please create account in BRPMgr for the new user MANUALLY!!!\nOpening BRP manager...");
             Thread.Sleep(processSleepTimer);
             ProcessStartInfo startInfo = new ProcessStartInfo();                                                                                    // Create a new process start info
             startInfo.FileName = @"F:\Imaging\BRPUserMgr.exe";                                                                                      // Set the file name to the path of the executable
@@ -1027,7 +1084,7 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred while trying to start the process: {ex.Message}");
+                AppLog.Error($"An error occurred while trying to start the process: {ex.Message}", ex);
             }// end of catch
         }// end of LaunchBRPMgr
         /// <summary>
@@ -1035,7 +1092,7 @@ namespace ADUtils
         /// </summary>
         private void LaunchVLMMgr()
         {
-            Console.WriteLine($"Please add a CLS license to the new user MANUALLY!!!\nOpening VLM...");
+            AppLog.Screen($"Please add a CLS license to the new user MANUALLY!!!\nOpening VLM...");
             Thread.Sleep(processSleepTimer);
 
             ProcessStartInfo startInfo = new ProcessStartInfo();                                                                                    // Create a new process start info
@@ -1047,7 +1104,7 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred while trying to start the process: {ex.Message}");
+                AppLog.Error($"An error occurred while trying to start the process: {ex.Message}", ex);
             }// end of catch
         }// end of LaunchVLMMgr
         /// <summary>
@@ -1055,7 +1112,7 @@ namespace ADUtils
         /// </summary>
         private void LaunchPhoneSystemSite()
         {
-            Console.WriteLine($"Please Add a extension to the new user MANUALLY!!!\nOpening HostMyCalls Site...");
+            AppLog.Screen($"Please Add a extension to the new user MANUALLY!!!\nOpening HostMyCalls Site...");
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo
@@ -1067,7 +1124,7 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                AppLog.Error($"An error occurred: {ex.Message}", ex);
             }// end of catch
         }// end of LaunchHostMyCallsSite
         /// <summary>
@@ -1075,7 +1132,7 @@ namespace ADUtils
         /// </summary>
         private void LaunchO365Site()
         {
-            Console.WriteLine($"Please Add a O365 licnese to the new user MANUALLY!!!\nOpening Microsoft Office Site...");
+            AppLog.Screen($"Please Add a O365 licnese to the new user MANUALLY!!!\nOpening Microsoft Office Site...");
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo
@@ -1087,34 +1144,36 @@ namespace ADUtils
             }// end of try
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                AppLog.Error($"An error occurred: {ex.Message}", ex);
             }// end of catch
         }// end of LaunchO365Site
         static void AnimateLine(string line)
         {
             foreach (char c in line)
             {
-                Console.Write(c);
+                Console.Write(c);                                                                    // character-by-character animation; logging each char would be noise
                 Thread.Sleep(10); // Adjust delay for speed of animation
             }
-            Console.WriteLine();
+            AppLog.Blank();
         }
         private void CheckManagerDN()
         {
-            using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
-            {
-                using (var managerPrincipal = UserPrincipal.FindByIdentity(context, manager))
-                {
-                    if (managerPrincipal != null)
-                    {
-                        // Retrieve the underlying DirectoryEntry for the manager
-                        DirectoryEntry directoryEntry = (DirectoryEntry)managerPrincipal.GetUnderlyingObject();
+            if (string.IsNullOrWhiteSpace(manager))
+                throw new InvalidOperationException("Manager SAM account name is empty.");
 
-                        // Get the Distinguished Name (DN)
-                        managerDN = directoryEntry.Properties["distinguishedName"].Value.ToString();
-                        Console.WriteLine($"Manager found: {managerPrincipal.DisplayName} (DN: {managerDN})");
-                    }
-                }
+            using (PrincipalContext context = new PrincipalContext(ContextType.Domain))
+            using (var managerPrincipal = UserPrincipal.FindByIdentity(context, manager))
+            {
+                if (managerPrincipal == null)
+                    throw new InvalidOperationException($"Manager '{manager}' was not found in Active Directory.");
+
+                DirectoryEntry directoryEntry = (DirectoryEntry)managerPrincipal.GetUnderlyingObject();
+                managerDN = directoryEntry.Properties["distinguishedName"].Value?.ToString();
+
+                if (string.IsNullOrEmpty(managerDN))
+                    throw new InvalidOperationException($"Could not retrieve DN for manager '{manager}'.");
+
+                AppLog.Info($"Manager found: {managerPrincipal.DisplayName} (DN: {managerDN})", Color.DarkCyan);
             }
         }// end of CheckManagerDN
     }// end of class

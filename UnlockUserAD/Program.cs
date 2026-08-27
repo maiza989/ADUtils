@@ -4,72 +4,78 @@ using ADUtils;
 using Pastel;
 using System.Drawing;
 using Microsoft.Extensions.Configuration;
-using System.Security.Cryptography.X509Certificates;
-using Yubico.YubiKey.Piv;
-using System.Security.Cryptography;
-using System.Net.Security;
-using System.Net;
-using System.Security.Principal;
-using Yubico.YubiKey;
-using System.Runtime.ConstrainedExecution;
-using System.Text;
-using System.DirectoryServices.Protocols;
-// TODO - DONE - Audit Logging: Log fuction to record important action performed.
-// TODO - DONE User Account Deactivation: Implement functionality to deactivate user accounts securely.
 // TODO - Create/Delete Groups: Allow creating and deleting security groups or distribution lists.
 
 
 /// <summary>
-/// Edit the following:
-/// 
-///  - BaseLogDirectory with your desire Log location in AuditLogManager Class.
-/// 
-///  - myDomain, myDomainDotCom, myParentOU, myCompany, myExchangeDatabase, myExchangeServer, and outPath with your own values for successful execution in AccountCreationManager Class.
-/// 
-///  - mySTMPServer, myFromEmail, myPassword, myToEmail with your own values for successful execution in EmailNotificationManager Class. 
-///  
+/// All deployment-specific values live in Appsettings.json — see Appsettings.example.json
+/// for the full set of keys. Copy that file to Appsettings.json and fill it in before
+/// running. Nothing in this project needs to be edited to point it at a domain.
 /// </summary>
 class Program
 {
 
-    static bool isLocked = false;
-    static int countdownSeconds = 60;
     public static string adminUsername;
     private static string adminPassword;
     static private bool isAuthenticated = false;
     public static IConfiguration configuration;
-    static X509Certificate2 selectedCert;
 
 
     static void GetAdminCreditials()
     {
 
-        Console.Write("Enter admin username: ");
-        adminUsername = Console.ReadLine().Trim();
-        Console.Write("Enter admin password: ");
+        AppLog.Prompt("Enter admin username: ");
+        adminUsername = ConsoleInput.ReadTrimmed();
+        AppLog.Prompt("Enter admin password: ");
         adminPassword = PasswordManager.GetPassword().Trim();
     }
 
 
     static void Main(string[] args)
     {
-        configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("Appsettings.json", optional: false, reloadOnChange: true)
-            .Build();
+        // Before any output: puts the console on UTF-8 so box-drawing and status glyphs render.
+        // A legacy code page best-fit-maps them instead, which silently turned em dashes into
+        // hyphens and would make the framing unreadable.
+        ConsoleUi.Initialize();
+
+        try
+        {
+            configuration = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("Appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+        }
+        catch (FileNotFoundException)
+        {
+            AppLog.Error("Appsettings.json was not found.");
+            AppLog.Screen($"Copy {"Appsettings.example.json".Pastel(Color.MediumPurple)} to " +
+                          $"{"Appsettings.json".Pastel(Color.MediumPurple)} in {AppContext.BaseDirectory} " +
+                          "and fill in your domain, Exchange and SMTP values.");
+            return;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"Appsettings.json could not be read: {ex.Message}", ex, Color.IndianRed);
+            return;
+        }
 
         ActiveDirectoryManager ADManager = new ActiveDirectoryManager();
         AccountCreationManager ACManager;
         PasswordManager PWDManager = null;
         ADGroupActionManager ADGroupManager = null;
         AuditLogManager auditLogManager = null;
-        EmailNotifcationManager emailManager = new EmailNotifcationManager(configuration);
         AccountDeactivationManager ACCDeactivationManager = new AccountDeactivationManager();
 
         string _myDomainName = configuration["AccountCreationSettings:myDomainName"];
 
-        Console.WriteLine("Starting Active Directory Manager...");
+        AppLog.Screen("Starting Active Directory Manager...");
+        if (AuditLogManager.VerifyLoggingConfigured())
+        {
+            AppLog.Screen($"Logs: {AuditLogManager.LogDirectory}", Color.DarkGray);
+        }
 
+        try
+        {
         do
         {
             try
@@ -83,33 +89,54 @@ class Program
                     {
 
                         isAuthenticated = true;
-                        Console.WriteLine($"Connected to Active Directory as: {context.UserName}.".Pastel(Color.GreenYellow));
+
+                        // Publish the credentials before constructing anything, so privileged AD
+                        // writes bind as this account rather than as the interactive user.
+                        AdminSession.Set(adminUsername, adminPassword, configuration);
+                        AppLog.Info($"Connected to Active Directory as: {context.UserName}.", Color.GreenYellow);
 
                         auditLogManager = new AuditLogManager(adminUsername, configuration);
                         ADGroupManager = new ADGroupActionManager(auditLogManager);
                         PWDManager = new PasswordManager(auditLogManager);
                         ACManager = new AccountCreationManager(auditLogManager, configuration);
+                        ADManager.SetAdminCredentials(adminUsername, adminPassword, configuration);
 
                         bool exit = false;
                         while (!exit)                                                                                                                                          // Loop the menu
                         {
                             DisplayMainMenu();
-                            string choice = Console.ReadLine();
+                            string choice = ConsoleInput.ReadLine();
                             exit = HandleMainMenuChoice(choice, context, ADManager, ADGroupManager, PWDManager, ACManager, ACCDeactivationManager);
                         }// end of while-loop
                     }// end of if statement
                     context.Dispose();
                 }// end of using
             }// end of try
-            catch (DirectoryServicesCOMException)                                                                                                                              // Error out if password/username are incorrect
+            catch (DirectoryServicesCOMException ex) // error out of user credentials are wrong or account is locked
             {
-                Console.WriteLine("Error: Unable to connect to the Active Directory server. Please check your credentials and try again.".Pastel(Color.IndianRed));
+                isAuthenticated = false; // reset so the loop retries credentials
+                AppLog.Error("Error: Unable to connect to the Active Directory server. Please check your credentials and try again.", ex);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}".Pastel(Color.IndianRed));
+                isAuthenticated = false; // reset so the loop retries credentials
+                AppLog.Error($"An error occurred: {ex.Message}", ex, Color.IndianRed);
             }// end of Catch
+            // Without this the loop would spin forever on a closed or exhausted stdin, since
+            // there is no further input to change the outcome.
+            if (ConsoleInput.EndOfInput && !isAuthenticated)
+            {
+                AppLog.Error("No more console input — giving up on authentication.");
+                break;
+            }
         } while (!isAuthenticated || string.IsNullOrEmpty(adminUsername));                                                                                                                                            // Repeat until a valid password is entered
+        }
+        finally
+        {
+            // Targets are async, so without this the last entries are lost on exit.
+            auditLogManager?.EndSession();
+            NLog.LogManager.Shutdown();
+        }
     }// end of Main Method
 
 
@@ -118,14 +145,14 @@ class Program
     //--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     static void DisplayMainMenu()
     {
-
-        Console.ForegroundColor = ConsoleColor.Gray;
-        Console.WriteLine("\nSelect an option:");
-        Console.WriteLine("1. Locked Out Management");
-        Console.WriteLine("2. Group Management");
-        Console.WriteLine("3. User Information Management");
-        Console.WriteLine("4. Exit");
-        Console.Write("Enter your choice: ");
+        ConsoleUi.Header();
+        ConsoleUi.Menu("Main Menu",
+            "Locked Out Management",
+            "Group Management",
+            "User Information",
+            "Reports",
+            "Exit");
+        ConsoleUi.Prompt("Choice");
     }// end of DisplayMainMenu
 
     /// <summary>
@@ -151,12 +178,15 @@ class Program
                 DisplayUserInfoMenu(context, ADManager, PWDManager, ACManager, ACCDeactivationManager);
                 break;
             case "4":
+                DisplayReportsMenu(context, ADManager);
+                break;
+            case "5":
                 return true;
             case "clear":
                 Console.Clear();
                 break;
             default:
-                Console.WriteLine("Invalid option. Please try again.".Pastel(Color.IndianRed));
+                ConsoleUi.Warn("Invalid option. Please try again.");
                 break;
         }// end of switch case
         return false;
@@ -172,13 +202,15 @@ class Program
         bool exit = false;
         while (!exit)
         {
-            Console.ForegroundColor = ConsoleColor.Gray;
-            Console.WriteLine("\nLocked Out Manager:");
-            Console.WriteLine("1. Unlock a Specific User");
-            Console.WriteLine("2. Check All Locked Accounts");
-            Console.WriteLine("3. Unlock All Locked Accounts");
-            Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
-            string choice = Console.ReadLine().ToLower().Trim();
+            ConsoleUi.Breadcrumb("Main", "Locked Out Management");
+            ConsoleUi.Menu("Locked Out Manager",
+                "Unlock a Specific User",
+                "Check All Locked Accounts",
+                "Unlock All Locked Accounts",
+                "Find Lockout Source for a User");
+            ConsoleUi.PromptWithExit("Choice");
+
+            string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
             {
                 case "1":
@@ -190,11 +222,14 @@ class Program
                 case "3":
                     ADManager.UnlockAllUsers(context);
                     break;
+                case "4":
+                    ADManager.FindLockoutSource();
+                    break;
                 case "exit":
                     exit = true;
                     break;
                 default:
-                    Console.WriteLine("Invalid option. Please try again.".Pastel(Color.IndianRed));
+                    ConsoleUi.Warn("Invalid option. Please try again.");
                     break;
             }// end of switch-case
         }// end of while
@@ -211,17 +246,18 @@ class Program
         bool exit = false;
         while (!exit)
         {
-            Console.ForegroundColor = ConsoleColor.Gray;
-            Console.WriteLine("\nGroup Management:");
-            Console.WriteLine("1. List All Groups in Active Directory");
-            Console.WriteLine("2. Add User to a Group");
-            Console.WriteLine("3. Remove User From a Group");
-            Console.WriteLine("4. Add User to a Shared Mailbox");
-            Console.WriteLine("5. Remove User From a Shared Mailbox");
-            Console.WriteLine("6. Check Who is Member in a Group");
-            Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
+            ConsoleUi.Breadcrumb("Main", "Group Management");
+            ConsoleUi.Menu("Group Management",
+                "List All Groups in Active Directory",
+                "Add User to a Group",
+                "Remove User From a Group",
+                "Grant Shared Mailbox Access",
+                "Revoke Shared Mailbox Access",
+                "Check Who is Member in a Group",
+                "Copy Groups From Another User");
+            ConsoleUi.PromptWithExit("Choice");
 
-            string choice = Console.ReadLine().ToLower().Trim();
+            string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
             {
                 case "1":
@@ -231,22 +267,25 @@ class Program
                     ADGroupManager.AddUserToGroup(context);
                     break;
                 case "3":
-                    ADGroupManager.RemoveUserToGroup(context);
+                    ADGroupManager.RemoveUserFromGroup(context);
                     break;
                 case "4":
-                    //ADGroupManager.AddUserToSharedMailbox();
+                    ADGroupManager.AddUserToSharedMailbox(context);
                     break;
                 case "5":
-                    //ADGroupManager.RemoveUserToSharedMailbox();
+                    ADGroupManager.RemoveUserFromSharedMailbox(context);
                     break;
                 case "6":
                     ADGroupManager.ListGroupMembers(context);
+                    break;
+                case "7":
+                    ADGroupManager.CopyGroupsFromUser(context);
                     break;
                 case "exit":
                     exit = true;
                     break;
                 default:
-                    Console.WriteLine("Invalid option. Please try again.".Pastel(Color.IndianRed));
+                    ConsoleUi.Warn("Invalid option. Please try again.");
                     break;
             }// end of switch-case
         }// end of while loop
@@ -264,16 +303,17 @@ class Program
         bool exit = false;
         while (!exit)
         {
-            Console.ForegroundColor = ConsoleColor.Gray;
-            Console.WriteLine("\nUser Information:");
-            Console.WriteLine("1. Check User Password Expiration Date");
-            Console.WriteLine("2. Display General User Info");
-            Console.WriteLine("3. Reset A User Password");
-            Console.WriteLine("4. Create New User Account");
-            Console.WriteLine("5. Disable User Account");
-            Console.Write($"Enter your choice(Type {"'exit'".Pastel(Color.MediumPurple)} to return to main menu): ");
+            ConsoleUi.Breadcrumb("Main", "User Information");
+            ConsoleUi.Menu("User Information",
+                "Check User Password Expiration Date",
+                "Display General User Info",
+                "Reset A User Password",
+                "Create New User Account",
+                "Disable User Account",
+                "Find a User (partial name search)");
+            ConsoleUi.PromptWithExit("Choice");
 
-            string choice = Console.ReadLine().ToLower().Trim();
+            string choice = ConsoleInput.ReadTrimmedLower();
             switch (choice)
             {
                 case "1":
@@ -291,20 +331,65 @@ class Program
                 case "5":
                     ACCDeactivationManager.DeactivateUserAccount(context, adminUsername, adminPassword);
                     break;
+                case "6":
+                    ADManager.FindUsers(context);
+                    break;
                 case "exit":
                     exit = true;
                     break;
                 default:
-                    Console.WriteLine("Invalid option. Please try again.".Pastel(Color.IndianRed));
+                    ConsoleUi.Warn("Invalid option. Please try again.");
                     break;
             }// end of switch-case
         }// end of while loop
         Console.Clear();
     }// end of DisplayUserInfoMenu
 
-    static void DisplayUserCreationMenu()
+    /// <summary>
+    /// Read-only reports. Grouped separately from the action menus so it is obvious that nothing
+    /// here changes anything.
+    /// </summary>
+    static void DisplayReportsMenu(PrincipalContext context, ActiveDirectoryManager ADManager)
     {
+        bool exit = false;
+        while (!exit)
+        {
+            ConsoleUi.Breadcrumb("Main", "Reports");
+            ConsoleUi.Menu("Reports (read-only)",
+                "Accounts Due for Deletion",
+                "Passwords Expiring Soon",
+                "Recent Lockouts (all DCs)",
+                "Validate Group Assignment (OUs + groups exist)",
+                "Compare a Role Against Its Peers");
+            ConsoleUi.PromptWithExit("Choice");
 
-    }
+            string choice = ConsoleInput.ReadTrimmedLower();
+            switch (choice)
+            {
+                case "1":
+                    ADManager.ReportAccountsDueForDeletion(context);
+                    break;
+                case "2":
+                    ADManager.ReportPasswordsExpiringSoon(context);
+                    break;
+                case "3":
+                    ADManager.ReportRecentLockouts();
+                    break;
+                case "4":
+                    ADManager.ReportGroupAssignmentValidation(context);
+                    break;
+                case "5":
+                    ADManager.ReportRoleGroupDrift(context);
+                    break;
+                case "exit":
+                    exit = true;
+                    break;
+                default:
+                    ConsoleUi.Warn("Invalid option. Please try again.");
+                    break;
+            }// end of switch-case
+        }// end of while loop
+        Console.Clear();
+    }// end of DisplayReportsMenu
 
 }// end of class
