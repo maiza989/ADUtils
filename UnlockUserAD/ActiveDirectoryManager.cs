@@ -713,6 +713,291 @@ namespace ADUtils
             }
         }// end of QueryLockoutEvent
 
+        // -----------------------------------------------------------------------------------------
+        //                          Onboarding table validation
+        // -----------------------------------------------------------------------------------------
+
+        /// <summary>The domain's DN, read from RootDSE rather than reassembled from config.</summary>
+        private static string GetDomainDn()
+        {
+            using var rootDse = new DirectoryEntry("LDAP://RootDSE");
+            return rootDse.Properties["defaultNamingContext"].Value as string;
+        }// end of GetDomainDn
+
+        /// <summary>
+        /// Whether an OU exists, given a relative path such as "OU=Staff,OU=Georgia_Users".
+        /// Internal so the check itself can be exercised with known-bad input.
+        /// </summary>
+        internal static bool OuExists(string relativeOuPath, string domainDn)
+        {
+            try
+            {
+                using var entry = new DirectoryEntry($"LDAP://{relativeOuPath},{domainDn}");
+                return entry.Guid != Guid.Empty;      // forces a bind; throws if it isn't there
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }// end of OuExists
+
+        /// <summary>
+        /// Whether a group exists, memoised because the 22 rows reference the same ~31 names
+        /// repeatedly and each miss is a full directory search.
+        /// </summary>
+        internal static bool GroupExists(PrincipalContext context, string groupName, Dictionary<string, bool> cache)
+        {
+            if (cache.TryGetValue(groupName, out bool known)) return known;
+
+            bool exists;
+            try
+            {
+                using GroupPrincipal group = GroupPrincipal.FindByIdentity(context, groupName);
+                exists = group != null;
+            }
+            catch (Exception)
+            {
+                exists = false;
+            }
+            cache[groupName] = exists;
+            return exists;
+        }// end of GroupExists
+
+        /// <summary>
+        /// Checks the onboarding tables against what is actually in AD.
+        ///
+        /// Nothing validated them before, so they drifted silently: a retired parent OU, sub-OU
+        /// names that never matched their role labels, and group names with typos. None of that
+        /// failed loudly -- new hires just quietly came out short.
+        /// </summary>
+        public void ReportGroupAssignmentValidation(PrincipalContext context)
+        {
+            ConsoleUi.Breadcrumb("Main", "Reports", "Validate Group Assignment");
+
+            try
+            {
+                string domainDn = GetDomainDn();
+                if (string.IsNullOrWhiteSpace(domainDn))
+                {
+                    ConsoleUi.Fail("Could not read the domain naming context from RootDSE.");
+                    return;
+                }
+                ConsoleUi.Note($"Validating against {domainDn}");
+
+                var groupCache = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+                var rows = new List<string[]>();
+                int badOus = 0, rowsWithMissingGroups = 0, rowsWithNoGroups = 0;
+                var allMissingGroups = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (TargetOU target in GroupAssignmentHelper.GetTargetOUs())
+                {
+                    // Built by the same helper the creator uses, so a pass here means the creator
+                    // targets the same place.
+                    string relativeOu = GroupAssignmentHelper.BuildRelativeOuPath(target);
+                    bool ouOk = OuExists(relativeOu, domainDn);
+                    if (!ouOk) badOus++;
+
+                    var groups = GroupAssignmentHelper.GetGroups(target.Region, target.Role);
+                    var missing = groups.Where(g => !GroupExists(context, g, groupCache)).ToList();
+
+                    if (groups.Count == 0) rowsWithNoGroups++;
+                    if (missing.Count > 0)
+                    {
+                        rowsWithMissingGroups++;
+                        foreach (string m in missing) allMissingGroups.Add(m);
+                    }
+
+                    rows.Add(new[]
+                    {
+                        target.Office,
+                        target.Role,
+                        target.Region,
+                        ouOk ? "OK" : "MISSING",
+                        relativeOu,
+                        groups.Count == 0 ? "NONE MAPPED" : groups.Count.ToString(),
+                        missing.Count == 0 ? "" : string.Join(", ", missing)
+                    });
+                }
+
+                ConsoleUi.Table(
+                    new[] { "Office", "Role", "Region", "OU", "Target OU path", "Groups", "Missing groups" },
+                    rows);
+
+                // Group-table rows that no office/role combination can reach. They look live in the
+                // source but can never be applied, which is how a wrong entry survives unnoticed.
+                var selectable = GroupAssignmentHelper.GetTargetOUs()
+                    .Select(t => $"{t.Region}|{t.Role}")
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                var unreachable = GroupAssignmentHelper.GetAllAssignments()
+                    .Where(a => !selectable.Contains($"{a.Region}|{a.Role}"))
+                    .ToList();
+
+                ConsoleUi.Blank();
+                if (badOus == 0 && rowsWithMissingGroups == 0 && rowsWithNoGroups == 0)
+                {
+                    ConsoleUi.Ok("Every target OU exists and every mapped group exists in AD.");
+                }
+                else
+                {
+                    if (badOus > 0) ConsoleUi.Fail($"{badOus} target OU(s) do not exist — hires for those roles cannot be placed.");
+                    if (rowsWithMissingGroups > 0)
+                    {
+                        ConsoleUi.Fail($"{rowsWithMissingGroups} role(s) reference {allMissingGroups.Count} group(s) that do not exist: " +
+                                       string.Join(", ", allMissingGroups));
+                    }
+                    if (rowsWithNoGroups > 0) ConsoleUi.Warn($"{rowsWithNoGroups} role(s) have no group mapping at all.");
+                }
+
+                if (unreachable.Count > 0)
+                {
+                    ConsoleUi.Warn($"{unreachable.Count} group-table row(s) can never be selected by any office/role: " +
+                                   string.Join(", ", unreachable.Select(u => $"{u.Region}/{u.Role}")));
+                    ConsoleUi.Note("Either add a matching office/role option, or delete the row.");
+                }
+
+                ConsoleUi.Note($"{groupCache.Count} distinct group name(s) checked.");
+            }
+            catch (Exception ex)
+            {
+                ConsoleUi.Fail($"Validation failed: {ex.Message}", ex);
+            }
+        }// end of ReportGroupAssignmentValidation
+
+        /// <summary>
+        /// For one role, compares its group list against what people already in that role's OU
+        /// actually hold.
+        ///
+        /// This is the half that finds what the table is *missing*: a group most of a role's peers
+        /// carry but the table never grants means every new hire in that role starts short, and
+        /// nobody notices because the account otherwise works.
+        /// </summary>
+        public void ReportRoleGroupDrift(PrincipalContext context)
+        {
+            ConsoleUi.Breadcrumb("Main", "Reports", "Compare a Role Against Its Peers");
+
+            var targets = GroupAssignmentHelper.GetTargetOUs();
+            ConsoleUi.Menu("Pick a role to compare",
+                targets.Select(t => $"{t.Office,-7} {t.Role,-12} -> {GroupAssignmentHelper.BuildRelativeOuPath(t)}").ToArray());
+            ConsoleUi.PromptWithExit("Choice");
+
+            string choice = ConsoleInput.ReadTrimmedLower();
+            if (choice == "exit") return;
+            if (!int.TryParse(choice, out int index) || index < 1 || index > targets.Count)
+            {
+                ConsoleUi.Warn($"Enter a number between 1 and {targets.Count}.");
+                return;
+            }
+
+            TargetOU target = targets[index - 1];
+
+            try
+            {
+                string domainDn = GetDomainDn();
+                string relativeOu = GroupAssignmentHelper.BuildRelativeOuPath(target);
+                var tableGroups = new HashSet<string>(
+                    GroupAssignmentHelper.GetGroups(target.Region, target.Role), StringComparer.OrdinalIgnoreCase);
+
+                if (!OuExists(relativeOu, domainDn))
+                {
+                    ConsoleUi.Fail($"{relativeOu} does not exist — fix the target OU before comparing.");
+                    return;
+                }
+
+                // Only enabled accounts directly in the OU: disabled leavers would drag in stale
+                // membership, and nested OUs are different roles.
+                var memberships = new List<HashSet<string>>();
+                using (var ouEntry = new DirectoryEntry($"LDAP://{relativeOu},{domainDn}"))
+                using (var searcher = new DirectorySearcher(ouEntry)
+                {
+                    Filter = "(&(objectCategory=person)(objectClass=user)(!userAccountControl:1.2.840.113556.1.4.803:=2))",
+                    SearchScope = SearchScope.OneLevel,
+                    PageSize = 500
+                })
+                {
+                    searcher.PropertiesToLoad.Add("memberof");
+                    using SearchResultCollection found = searcher.FindAll();
+                    foreach (SearchResult result in found)
+                    {
+                        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (string dn in result.Properties["memberof"])
+                        {
+                            // "CN=Collectors,OU=..." -> "Collectors"
+                            string cn = dn.Split(',')[0];
+                            if (cn.StartsWith("CN=", StringComparison.OrdinalIgnoreCase)) cn = cn.Substring(3);
+                            if (cn.Length > 0) names.Add(cn);
+                        }
+                        memberships.Add(names);
+                    }
+                }
+
+                ConsoleUi.Panel($"{target.Office} {target.Role}", new[]
+                {
+                    ("Region", target.Region),
+                    ("Target OU", relativeOu),
+                    ("Groups in table", tableGroups.Count.ToString()),
+                    ("Enabled peers found", memberships.Count.ToString())
+                });
+
+                if (memberships.Count == 0)
+                {
+                    ConsoleUi.Warn("No enabled users in that OU — nothing to compare against.");
+                    ConsoleUi.Note("Use 'Copy Groups From Another User' against a known-good colleague instead.");
+                    return;
+                }
+                if (memberships.Count < 3)
+                {
+                    // Several KY sub-OUs hold 0-1 users; a "most peers have this" claim from one
+                    // account is noise, so say that rather than print a misleading result.
+                    ConsoleUi.Warn($"Only {memberships.Count} peer(s) in that OU — too few to draw a conclusion from.");
+                    ConsoleUi.Note("Treat the rows below as a single data point, not a pattern.");
+                }
+
+                int threshold = (int)Math.Ceiling(memberships.Count * 0.7);
+                var tally = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (var set in memberships)
+                {
+                    foreach (string g in set) tally[g] = tally.TryGetValue(g, out int n) ? n + 1 : 1;
+                }
+
+                var common = tally.Where(kv => kv.Value >= threshold)
+                                  .OrderByDescending(kv => kv.Value)
+                                  .ToList();
+
+                ConsoleUi.Table(new[] { "Group", "Peers", "In table?" },
+                    common.Select(kv => new[]
+                    {
+                        kv.Key,
+                        $"{kv.Value}/{memberships.Count}",
+                        tableGroups.Contains(kv.Key) ? "yes" : "*** MISSING ***"
+                    }));
+
+                var missingFromTable = common.Where(kv => !tableGroups.Contains(kv.Key)).Select(kv => kv.Key).ToList();
+                var notHeldByPeers = tableGroups.Where(g => !tally.ContainsKey(g)).ToList();
+
+                ConsoleUi.Blank();
+                if (missingFromTable.Count > 0)
+                {
+                    ConsoleUi.Fail($"{missingFromTable.Count} group(s) held by most peers are NOT granted to new hires: " +
+                                   string.Join(", ", missingFromTable));
+                }
+                if (notHeldByPeers.Count > 0)
+                {
+                    ConsoleUi.Warn($"{notHeldByPeers.Count} group(s) in the table are held by no peer at all: " +
+                                   string.Join(", ", notHeldByPeers));
+                    ConsoleUi.Note("Either the group is obsolete, or the peers are the ones missing it.");
+                }
+                if (missingFromTable.Count == 0 && notHeldByPeers.Count == 0)
+                {
+                    ConsoleUi.Ok("The table matches what this role's peers actually hold.");
+                }
+            }
+            catch (Exception ex)
+            {
+                ConsoleUi.Fail($"Comparison failed: {ex.Message}", ex);
+            }
+        }// end of ReportRoleGroupDrift
+
         /// <summary>One Event 4740 record.</summary>
         private sealed class LockoutEvent
         {
@@ -1108,9 +1393,11 @@ namespace ADUtils
         {
             ConsoleUi.Breadcrumb("Main", "Reports", "Passwords Expiring Soon");
 
-            ConsoleUi.Prompt("Within how many days (Enter for 14)");
+            // 30 rather than 14: the effective policy here is 90 days, so a month's window shows a
+            // useful slice of the cycle without burying you in rows.
+            ConsoleUi.Prompt("Within how many days (Enter for 30)");
             string input = ConsoleInput.ReadTrimmed();
-            int days = int.TryParse(input, out int parsed) && parsed > 0 ? parsed : 14;
+            int days = int.TryParse(input, out int parsed) && parsed > 0 ? parsed : 30;
 
             try
             {

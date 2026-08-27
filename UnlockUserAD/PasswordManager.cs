@@ -199,33 +199,58 @@ namespace ADUtils
         }// end of GetPasswordExpirationDate
 
         /// <summary>
-        /// A method return password exipration date object for a user
+        /// The attribute AD computes per user for when their password expires. Constructed, so it
+        /// is not returned unless explicitly requested -- see the RefreshCache call below.
         /// </summary>
-        /// <param name="user"> Uses user Object in AD</param>
-        /// <returns> Password expiration date</returns>
+        private const string PasswordExpiryAttribute = "msDS-UserPasswordExpiryTimeComputed";
+
+        /// <summary>
+        /// When a password expires, as Active Directory itself computes it.
+        ///
+        /// This used to be calculated as pwdLastSet + the *domain* maxPwdAge, which ignores
+        /// fine-grained password policies. This domain has one -- Lloyd_Password_Policy, 90 days,
+        /// applied to Domain Users -- overriding a 30-day domain default, so every expiry was
+        /// reported 60 days early. Asking AD for the computed value honours any PSO automatically
+        /// and needs no policy enumeration.
+        /// </summary>
+        /// <returns>The expiry date, or DateTime.MinValue when the password does not expire.</returns>
         public DateTime GetPasswordExpirationDate(UserPrincipal user)
         {
             if (user == null) return DateTime.MinValue;
+            if (user.PasswordNeverExpires) return DateTime.MinValue;
 
             try
             {
                 DirectoryEntry deUser = (DirectoryEntry)user.GetUnderlyingObject();
+
+                // Constructed attributes are absent from the default property cache; without this
+                // the value comes back empty and every account looks like it never expires.
+                deUser.RefreshCache(new[] { PasswordExpiryAttribute });
+
+                long? fileTime = ConvertLargeIntegerToLong(deUser.Properties[PasswordExpiryAttribute].Value);
+                if (fileTime.HasValue)
+                {
+                    // Two sentinels, neither of which is a real date: long.MaxValue means the
+                    // password never expires, 0 means it must be changed at next logon. Passing
+                    // either to FromFileTimeUtc throws.
+                    if (fileTime.Value == long.MaxValue || fileTime.Value <= 0) return DateTime.MinValue;
+
+                    return DateTime.FromFileTimeUtc(fileTime.Value).ToLocalTime();
+                }
+
+                // The attribute is unavailable (pre-2008 functional level, or no read access).
+                // Fall back to the old arithmetic, which is PSO-blind and so may read early.
+                AppLog.Detail($"{PasswordExpiryAttribute} unavailable for '{user.SamAccountName}'; falling back to the domain maximum password age.");
+
                 DateTime? pwdLastSet = ConvertLargeIntegerToDateTime(deUser.Properties["pwdLastSet"].Value);
-
-                if (!pwdLastSet.HasValue || user.PasswordNeverExpires)
-                    return DateTime.MinValue;
-
                 TimeSpan? maxPwdAge = GetDomainMaxPasswordAge(user.Context);
-                if (!maxPwdAge.HasValue)
-                    return DateTime.MinValue;
+                if (!pwdLastSet.HasValue || !maxPwdAge.HasValue) return DateTime.MinValue;
 
-                // maxPwdAge is stored as a negative timespan; add absolute value to last set
-                DateTime expiration = pwdLastSet.Value.AddTicks(Math.Abs(maxPwdAge.Value.Ticks));
-                return expiration;
+                return pwdLastSet.Value.AddTicks(Math.Abs(maxPwdAge.Value.Ticks));
             }
             catch (Exception ex)
             {
-                // Report rather than swallow: a rights failure reading pwdLastSet used to be
+                // Report rather than swallow: a rights failure reading the attribute used to be
                 // indistinguishable from "the password never expires".
                 AppLog.Warn($"Could not determine password expiration for '{user.SamAccountName}': {ex.Message}", ex, Color.DarkGoldenrod);
                 return DateTime.MinValue;
@@ -291,6 +316,14 @@ namespace ADUtils
             }
         }
 
+        /// <summary>
+        /// The domain-wide maximum password age.
+        ///
+        /// FALLBACK ONLY -- do not make this the primary source again. It reads the domain object,
+        /// which is blind to fine-grained password policies: this domain's PSO sets 90 days while
+        /// the domain object says 30, so relying on this reported every expiry 60 days early.
+        /// <see cref="GetPasswordExpirationDate"/> asks AD for the per-user computed value instead.
+        /// </summary>
         private TimeSpan? GetDomainMaxPasswordAge(PrincipalContext context)
         {
             try

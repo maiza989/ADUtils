@@ -358,7 +358,9 @@ class Program
             ConsoleUi.Menu("Reports (read-only)",
                 "Accounts Due for Deletion",
                 "Passwords Expiring Soon",
-                "Recent Lockouts (all DCs)");
+                "Recent Lockouts (all DCs)",
+                "Validate Group Assignment (OUs + groups exist)",
+                "Compare a Role Against Its Peers");
             ConsoleUi.PromptWithExit("Choice");
 
             string choice = ConsoleInput.ReadTrimmedLower();
@@ -372,6 +374,12 @@ class Program
                     break;
                 case "3":
                     ADManager.ReportRecentLockouts();
+                    break;
+                case "4":
+                    ADManager.ReportGroupAssignmentValidation(context);
+                    break;
+                case "5":
+                    ADManager.ReportRoleGroupDrift(context);
                     break;
                 case "exit":
                     exit = true;

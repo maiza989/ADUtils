@@ -522,41 +522,9 @@ namespace ADUtils
             // -------------------------
             // Define OU options dynamically
             // -------------------------
-            var TargetOUs = new List<TargetOU>
-    {
-                //TODO - fix empty target OU for MI and GA users.
-                //TODO - Test MI and GA user creation with group membership assignment.
-        // KY
-        new TargetOU("KY", "IT", "LloydMc_Lou"),
-        new TargetOU("KY", "Collector", "LloydMc_Lou"),
-        new TargetOU("KY", "Admin Staff", "LloydMc_Lou"),
-        new TargetOU("KY", "Atty", "LloydMc_Lou"),
-        new TargetOU("KY", "Acct", "LloydMc_Lou"),
-        new TargetOU("KY", "Compliance", "LloydMc_Lou"),
-
-        // MI
-        new TargetOU("MI", "General", "Michigan_Users", "Michigan Users"),
-        new TargetOU("MI", "Collector", "Michigan_Users", "Michigan Collector"),
-        new TargetOU("MI", "Admin Staff", "Michigan_Users", "Michigan Admin Staff"),
-        new TargetOU("MI", "Atty", "Michigan_Users", "Michigan Atty"),
-        new TargetOU("MI", "Acct", "Michigan_Users", "Michigan Accounting"),
-
-        // GA
-        new TargetOU("GA", "General", "Cooling_Users", "Default Georgia Users"),
-        new TargetOU("GA", "Call_Center", "Cooling_Users", "Georgia Collector"),
-        new TargetOU("GA", "GA_Staff", "Cooling_Users", "Georgia Admin Staff"),
-        new TargetOU("GA", "Atty", "Cooling_Users", "Georgia Atty"),
-        new TargetOU("GA", "Accounting", "Cooling_Users", "Georgia Accounting"),
-
-        // Remote. Office is what the operator types ("REMOTE"); Region must match the
-        // Region values in GroupAssignmentHelper ("KY-Remote") or the new hire gets no groups.
-        new TargetOU("REMOTE", "IT", "LloydMc_Lou", region: "KY-Remote"),
-        new TargetOU("REMOTE", "Collector", "LloydMc_Lou", region: "KY-Remote"),
-        new TargetOU("REMOTE", "Admin Staff", "LloydMc_Lou", region: "KY-Remote"),
-        new TargetOU("REMOTE", "Atty", "LloydMc_Lou", region: "KY-Remote"),
-        new TargetOU("REMOTE", "Acct", "LloydMc_Lou", region: "KY-Remote"),
-        new TargetOU("REMOTE", "Compliance", "LloydMc_Lou", region: "KY-Remote")
-    };
+            // Shared with the "Validate Group Assignment" report, so the rows the operator picks
+            // from are exactly the rows that get checked against AD.
+            var TargetOUs = GroupAssignmentHelper.GetTargetOUs();
 
             // Filter options by office
             var filteredOptions = TargetOUs.Where(o => o.Office == office).ToList();
@@ -586,8 +554,9 @@ namespace ADUtils
             } while (!validInput);
 
             var selectedOU = filteredOptions[choice - 1];
-            // "General" is a display label only — no sub-OU exists for it in AD
-            targetOU = selectedOU.Role == "General" ? "" : selectedOU.Role;
+            // SubOu, not Role: the AD OU is often named differently from the role label
+            // ("Atty" -> OU=Attorneys, "GA_Staff" -> OU=Staff), and empty means "sit in the parent".
+            targetOU = selectedOU.SubOu;
             _myParentOU = selectedOU.ParentOU;
             string region = selectedOU.Region;   // not Office — see TargetOU.Region
             string role = selectedOU.Role; // keep "General" for group lookup
@@ -609,7 +578,7 @@ namespace ADUtils
             lastInitial = lastName.Substring(0, 1);
             username = $"{firstInitial.ToLower()}{lastName.ToLower()}";
             email = $"{username}@{_myCompany}.com";
-            password = GenerateTempPassword();
+            password = $"New_User_lloydmc_{firstInitial}{lastInitial}!";
             userProfile = $@"\\lmusrdata\User_Profiles\{username}";
             clsUserFolder = $@"\\lmcls\sys\users\{firstInitial.ToLower()}{lastName.ToLower()}";
 
@@ -677,9 +646,9 @@ namespace ADUtils
             bool mailboxCreated = false;
             try
             {
-                ouPath = string.IsNullOrEmpty(targetOU)
-                    ? $"LDAP://OU={_myParentOU},DC={_myDomain},DC={_myDomainDotCom}"
-                    : $"LDAP://OU={targetOU},OU={_myParentOU},DC={_myDomain},DC={_myDomainDotCom}";
+                // Built by the same helper the validation report uses, so a clean report means the
+                // creator really does target the OU that was checked.
+                ouPath = $"LDAP://{GroupAssignmentHelper.BuildRelativeOuPath(selectedOU)},DC={_myDomain},DC={_myDomainDotCom}";
 
                 using (PrincipalContext context = new PrincipalContext(ContextType.Domain, null, adminUsername, adminPassword))
                 {
